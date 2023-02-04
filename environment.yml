@@ -1,0 +1,13 @@
+name: numisma
+channels:
+  - anaconda
+  - defaults
+dependencies:
+  - python>3.9
+  - pip 
+  - pip:
+    - matplotlib
+    - numpy
+    - opencv-python
+    - pillow
+prefix: D:\Users\alexa\anaconda3\envs\class
