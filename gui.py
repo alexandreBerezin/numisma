@@ -9,12 +9,10 @@ from PIL import Image,ImageTk
 
 import threading
 import configparser
-import sys
 
 ### Lecture des paramètres depuis config.ini
 config = configparser.ConfigParser()
 parentPath = Path(Path(__file__).parent)
-sys.path.append(parentPath)
 import core
 
 config.read(Path(parentPath,"config.ini"))
@@ -123,17 +121,24 @@ class StartPage(tk.Frame):
 
         if core.isDataAvailable(folderPath):
             
-            print("data available")
-        
-            nameList, D ,Hm = core.getSavedData(folderPath)
-            orderedLinks = core.getOrderedLinks(D,Hm)
+            MsgBox = tk.messagebox.askquestion ('Données de calcul',"Des données d'un calcul précédent ont été trouvées, voulez vous les utiliser ? ")
+            if MsgBox == 'yes':
+                print("data available")
             
-            self.controller.updateParam(nameList, D ,Hm,orderedLinks,folderPath)
+                nameList, D ,Hm = core.getSavedData(folderPath)
+                orderedLinks = core.getOrderedLinks(D,Hm)
+                
+                self.controller.updateParam(nameList, D ,Hm,orderedLinks,folderPath)
+                
+                self.controller.frames["ComparePage"].setNewImg()
+                self.controller.frames["ComparePage"].updateFromSlider(50)
+                
+                self.controller.show_frame("ComparePage")
+
+            else:
+                self.controller.startNewComputation(folderPath)
             
-            self.controller.frames["ComparePage"].setNewImg()
-            self.controller.frames["ComparePage"].updateFromSlider(50)
-            
-            self.controller.show_frame("ComparePage")
+
             
         else:
             self.controller.startNewComputation(folderPath)
@@ -243,29 +248,37 @@ class ComputationPage(tk.Frame):
         tk.Frame.__init__(self, parent)
         self.folderPath = folderPath
         self.controller = controller
-        label = tk.Label(self, text="Appuyer sur start pour lancer le calcul")
+        
+        self.presentation = tk.StringVar()
+        self.presentation.set("Appuyer sur start pour lancer le calcul :")
+        
+        label = tk.Label(self, textvariable=self.presentation)
         label.pack(side="top", fill="x", pady=5,padx=5)
+        
+        self.button1 = tk.Button(self, text="start",
+                            command=threading.Thread(target=self.start,args=()).start)
+
+        self.button1.pack(padx=5,pady=5)
         
         self.progress_var = tk.DoubleVar()
         
         progressBar = ttk.Progressbar(self,variable=self.progress_var, maximum=100)
-        progressBar.pack(side="top",fill=tk.X,padx=5,pady=5)
+        progressBar.pack(side="top",fill=tk.X,padx=10,pady=5)
         
         self.strAvance = tk.StringVar()
-        
         labelAvanc = tk.Label(self, textvariable=self.strAvance)
         labelAvanc.pack(side="top", fill="x", pady=10)
         
         
         
-        button1 = tk.Button(self, text="start",
-                            command=threading.Thread(target=self.start,args=()).start)
 
-        button1.pack(padx=20,pady=20)
         
         
     def start(self):
         import numpy as np
+        
+        self.presentation.set("Calcul en cours...")
+        self.button1["state"]= tk.DISABLED
 
         nameList, D ,Hm= core.getMatrixFromFolder(self.folderPath,contrastThreshold=CONTRAST_THRESHOLD,ratio=RATIO,callback=self.callbackProgressBar)
 
