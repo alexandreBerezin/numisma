@@ -61,6 +61,34 @@ def getImgDrawMatch(path1:Path,path2:Path,ratio:float=0.8,contrastThreshold:floa
     
     return img3,nbFeatures
 
+
+def getKpDes(img,contrastThreshold):
+    sift = cv.SIFT_create(contrastThreshold=contrastThreshold)
+    # find the keypoints and descriptors with SIFT
+    kp, des = sift.detectAndCompute(img,None)
+    return kp,des
+    
+    
+def getMatrixAndNumber(kp1,des1,kp2,des2,ratio):
+    bf = cv.BFMatcher()
+    matches = bf.knnMatch(des1,des2,k=2)
+    # Apply ratio test
+    good = []
+    for m,n in matches:
+        if m.distance < ratio*n.distance:
+            good.append([m])
+    
+    # Estimation de la transformation
+    goodArray = np.array(good).ravel()
+    src_pts = np.float32( [  kp1[m.queryIdx].pt for m in goodArray]).reshape(-1,1,2)
+    dst_pts = np.float32( [  kp2[m.trainIdx].pt for m in goodArray]).reshape(-1,1,2)
+    
+    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=10)
+    nbMatchedFeatures = np.sum(rigid_mask==1)
+
+    return H,nbMatchedFeatures
+    
+
 def getMatchedFeaturesNumber(img1:np.ndarray,img2:np.ndarray,contrastThreshold:float,ratio:float)->tuple[np.ndarray,int]:
     """Fonction qui renvoie la matrice de transformation rigide (2*3) et le
     nombre de correspondances entre les deux images
@@ -152,13 +180,18 @@ def getMatrixFromFolder(folderPath:Path,contrastThreshold:float,ratio:float,call
     
     total = (N-1)*N/2
     
+    kpDesList = []
+    
     for idx1 in range(N): 
-        img1 = cv.imread(str(allPath[idx1]),cv.IMREAD_GRAYSCALE) # queryImage        
+        img1 = cv.imread(str(allPath[idx1]),cv.IMREAD_GRAYSCALE) # queryImage     
+        kp1,des1 = getKpDes(img=img1,contrastThreshold=contrastThreshold)
+        kpDesList.append([kp1,des1])
         
         for idx2 in range(idx1):
-            img2 = cv.imread(str(allPath[idx2]),cv.IMREAD_GRAYSCALE) # trainImage
+            kp2,des2 = kpDesList[idx2]
             c=c+1
-            H,nbFeatures = getMatchedFeaturesNumber(img1,img2,contrastThreshold=contrastThreshold,ratio=ratio)
+        
+            H,nbFeatures = getMatrixAndNumber(kp1,des1,kp2,des2,ratio=ratio)
             
             D[idx1,idx2]=nbFeatures
             Hm[idx1,idx2]=H

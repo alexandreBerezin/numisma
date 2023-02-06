@@ -311,8 +311,8 @@ class ComputationPage(tk.Frame):
         self.strAvance.set(f"{pourcent:.2f}% \n temps restant : {self.tmpsRestantMin:.2f}min")
         if self.timeCounter == 1 :
             self.t1 = time.time()
-        if self.timeCounter == 10:
-            delta = (time.time()-self.t1)/10 #pap liaison
+        if self.timeCounter == 50:
+            delta = (time.time()-self.t1)/50 #par liaison
             
             tempsRestant = delta*(total-c)
             self.tmpsRestantMin = tempsRestant/60
