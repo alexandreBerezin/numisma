@@ -150,6 +150,8 @@ def getMatrixFromFolder(folderPath:Path,contrastThreshold:float,ratio:float,call
     Hm = np.zeros((N,N,2,3))
     c=0
     
+    total = (N-1)*N/2
+    
     for idx1 in range(N): 
         img1 = cv.imread(str(allPath[idx1]),cv.IMREAD_GRAYSCALE) # queryImage        
         
@@ -161,9 +163,10 @@ def getMatrixFromFolder(folderPath:Path,contrastThreshold:float,ratio:float,call
             D[idx1,idx2]=nbFeatures
             Hm[idx1,idx2]=H
             
-            pourcent = 2*c/((N-1)*N)*100
+            pourcent = 100*c/total
+
             print(f":{pourcent:.2f}%         ",end='\r')
-            callback(pourcent)
+            callback(c,total)
             
     nameList = [path.name for path in allPath]
             

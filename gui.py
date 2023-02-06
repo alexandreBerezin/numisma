@@ -10,6 +10,8 @@ from PIL import Image,ImageTk
 import threading
 import configparser
 
+import time
+
 ### Lecture des paramètres depuis config.ini
 config = configparser.ConfigParser()
 parentPath = Path(Path(__file__).parent)
@@ -279,6 +281,9 @@ class ComputationPage(tk.Frame):
         
         self.presentation.set("Calcul en cours...")
         self.button1["state"]= tk.DISABLED
+        
+        self.timeCounter = 0 
+        self.tmpsRestantMin = 0
 
         nameList, D ,Hm= core.getMatrixFromFolder(self.folderPath,contrastThreshold=CONTRAST_THRESHOLD,ratio=RATIO,callback=self.callbackProgressBar)
 
@@ -286,14 +291,33 @@ class ComputationPage(tk.Frame):
         np.save(Path(self.folderPath,"Hm.npy"),Hm)
         np.save(Path(self.folderPath,"nameList.npy"),nameList)
         
+                    
+        nameList, D ,Hm = core.getSavedData(self.folderPath)
+        orderedLinks = core.getOrderedLinks(D,Hm)
         
-        self.controller.show_frame("StartPage")
+        self.controller.updateParam(nameList, D ,Hm,orderedLinks,self.folderPath)
         
+        self.controller.frames["ComparePage"].setNewImg()
+        self.controller.frames["ComparePage"].updateFromSlider(50)
+        
+        self.controller.show_frame("ComparePage")
+
 
                 
-    def callbackProgressBar(self,val):
-        self.progress_var.set(val)
-        self.strAvance.set(f"{val:.2f}%")
+    def callbackProgressBar(self,c,total):
+        self.timeCounter += 1 
+        pourcent = 100*c/total
+        self.progress_var.set(pourcent)
+        self.strAvance.set(f"{pourcent:.2f}% \n temps restant : {self.tmpsRestantMin:.2f}min")
+        if self.timeCounter == 1 :
+            self.t1 = time.time()
+        if self.timeCounter == 10:
+            delta = (time.time()-self.t1)/10 #pap liaison
+            
+            tempsRestant = delta*(total-c)
+            self.tmpsRestantMin = tempsRestant/60
+            self.timeCounter = 0 
+       
         
         
 def start():
