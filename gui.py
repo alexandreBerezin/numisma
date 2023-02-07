@@ -11,6 +11,7 @@ import threading
 import configparser
 
 import time
+import numpy as np
 
 ### Lecture des paramètres depuis config.ini
 config = configparser.ConfigParser()
@@ -180,7 +181,21 @@ class ComparePage(tk.Frame):
         btn_before = tk.Button(master=ImgAndSliderFrame, text="Précédent",command=self.beforeLink)
         btn_before.pack(side="left",padx=10,pady=10)
         
+        btn_mode = tk.Button(master=ImgAndSliderFrame, text="mode",command=self.changeMode)
+        btn_mode.pack(side="bottom",padx=10,pady=10)
+        
+        self.displayMode = 0 # slider 
+        
         self.controller.bind('<KeyPress>',self.key_press)
+        
+    
+    def changeMode(self):
+        if self.displayMode == 0:
+            self.displayMode = 1
+            self.updateFromSlider(50)
+        else:
+            self.displayMode = 0
+            self.updateFromSlider(50)
         
         
     def key_press(self,e):
@@ -194,6 +209,9 @@ class ComparePage(tk.Frame):
             
         if e.keysym == "space":
             self.nextLink()
+            
+        if e.keysym == "m":
+            self.changeMode()
             
         if e.keysym == "BackSpace":
             self.beforeLink()
@@ -220,13 +238,33 @@ class ComparePage(tk.Frame):
         self.slider.set(50)
         
     def updateFromSlider(self,e):
-        x = float(e)/100
+        if self.displayMode == 0:
+            x = float(e)/100
+            
+            img = core.getSliderImg(self.img1,self.img2,self.H,x,ZOOM)
+            img = Image.fromarray(img)
+            img = ImageTk.PhotoImage(img)
+            self.labelImg.configure(image=img)
+            self.labelImg.image=img
         
-        img = core.getSliderImg(self.img1,self.img2,self.H,x,ZOOM)
-        img = Image.fromarray(img)
-        img = ImageTk.PhotoImage(img)
-        self.labelImg.configure(image=img)
-        self.labelImg.image=img
+        else:
+            h = 500
+            a,b,c = np.shape(self.img1)
+            img1 = cv.cvtColor(self.img1, cv.COLOR_BGR2RGB)[int(a/2-h/2):int(a/2+h/2),int(a/2-h/2):int(a/2+h/2),:]
+            img2 = cv.cvtColor(self.img2, cv.COLOR_BGR2RGB)[int(a/2-h/2):int(a/2+h/2),int(a/2-h/2):int(a/2+h/2),:]
+
+            img1 = Image.fromarray( img1)
+            img2 = Image.fromarray(img2)
+            dst = Image.new('RGB', (img1.width + img2.width, img1.height))
+            dst.paste(img1, (0, 0))
+            dst.paste(img2, (img1.width, 0))
+            img = ImageTk.PhotoImage(dst)
+            self.labelImg.configure(image=img)
+            self.labelImg.image=img
+            
+            
+            
+            
         
         
     def nextLink(self):
@@ -317,13 +355,10 @@ class ComputationPage(tk.Frame):
             tempsRestant = delta*(total-c)
             self.tmpsRestantMin = tempsRestant/60
             self.timeCounter = 0 
-       
-        
-        
+              
 def start():
     app = App()
     app.mainloop()
-    
 
 if __name__ == "__main__":
     app = App()
