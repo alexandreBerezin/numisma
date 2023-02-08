@@ -2,7 +2,7 @@
 
 outil de classification d'anciennes monnaies
 
-## Instalation (avec Conda)
+## Installation (avec Conda)
 - se deplacer dans un dossier d'installation 
 - copier le code avec :   
 git clone https://github.com/alexandreBerezin/numisma.git
