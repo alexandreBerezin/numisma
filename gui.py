@@ -24,6 +24,7 @@ SLIDER_SPEED = int(config["controls"]["sliderSpeed"])
 CONTRAST_THRESHOLD = float(config["calcul"]["contrastThreshold"])
 RATIO = float(config["calcul"]["ratio"])
 ZOOM = int(config["graphics"]["zoom"])
+ZOOM2 = int(config["graphics"]["zoom2"])
 
 
 class App(tk.Tk):
@@ -154,6 +155,7 @@ class ComparePage(tk.Frame):
         self.controller = controller
         
         self.index = 0 
+        self.numberLinks,_ = np.shape(self.controller.orderedLinks)
         
         ###Top folder Path
         
@@ -234,7 +236,7 @@ class ComparePage(tk.Frame):
         self.img1 = cv.imread(str(path1)) # queryImage
         self.img2 = cv.imread(str(path2)) # trainImage
         
-        self.labelCoin.config(text = f"{nameList[id1]}   -  {nameList[id2]} \n D = {int(self.controller.D[id1,id2])} ")
+        self.labelCoin.config(text = f"liaison {self.index}/{self.numberLinks} \n {nameList[id1]}   -  {nameList[id2]} \n D = {int(self.controller.D[id1,id2])} ")
         self.slider.set(50)
         
     def updateFromSlider(self,e):
@@ -248,7 +250,7 @@ class ComparePage(tk.Frame):
             self.labelImg.image=img
         
         else:
-            h = 500
+            h = ZOOM2
             a,b,c = np.shape(self.img1)
             img1 = cv.cvtColor(self.img1, cv.COLOR_BGR2RGB)[int(a/2-h/2):int(a/2+h/2),int(a/2-h/2):int(a/2+h/2),:]
             img2 = cv.cvtColor(self.img2, cv.COLOR_BGR2RGB)[int(a/2-h/2):int(a/2+h/2),int(a/2-h/2):int(a/2+h/2),:]

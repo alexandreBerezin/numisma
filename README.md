@@ -16,6 +16,14 @@ python gui.py
 - selectionner un dossier contenu dans le dossier data
 
 
+## raccourcis
+
+liaison suivate:    ESPACE
+liaison précédente: EFFACER
+changer de mode:    m
+bouger le slider:   <- et ->
+
+
 
 
 
