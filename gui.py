@@ -23,6 +23,8 @@ config.read(Path(parentPath,"config.ini"))
 SLIDER_SPEED = int(config["controls"]["sliderSpeed"])
 CONTRAST_THRESHOLD = float(config["calcul"]["contrastThreshold"])
 RATIO = float(config["calcul"]["ratio"])
+
+USE_FILTER = bool(int(config["graphics"]["useFilter"]))
 ZOOM = int(config["graphics"]["zoom"])
 ZOOM2 = int(config["graphics"]["zoom2"])
 
@@ -130,7 +132,7 @@ class StartPage(tk.Frame):
                 print("data available")
             
                 nameList, D ,Hm = core.getSavedData(folderPath)
-                orderedLinks = core.getOrderedLinks(D,Hm)
+                orderedLinks = core.getOrderedLinks(D,Hm,USE_FILTER)
                 
                 self.controller.updateParam(nameList, D ,Hm,orderedLinks,folderPath)
                 
@@ -333,7 +335,7 @@ class ComputationPage(tk.Frame):
         
                     
         nameList, D ,Hm = core.getSavedData(self.folderPath)
-        orderedLinks = core.getOrderedLinks(D,Hm)
+        orderedLinks = core.getOrderedLinks(D,Hm,USE_FILTER)
         
         self.controller.updateParam(nameList, D ,Hm,orderedLinks,self.folderPath)
         

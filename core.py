@@ -205,7 +205,7 @@ def getMatrixFromFolder(folderPath:Path,contrastThreshold:float,ratio:float,call
             
     return nameList,D,Hm
 
-def getOrderedLinks(D,Hm):
+def getOrderedLinks(D,Hm,useFilter:bool):
     
     dim = np.shape(D)
     N,_ =dim 
@@ -213,7 +213,14 @@ def getOrderedLinks(D,Hm):
     nbComparaison = int(N*(N-1)/2)
 
     ordered = np.dstack(np.unravel_index(np.argsort(-Dravel),dim))[0][:nbComparaison]
-    orderedLinks = [link for link in ordered if _filterLink(link,Hm)]
+
+    # un filtre partiel pour éviter d'afficher des liaisons aberrantes 
+    if useFilter:
+        orderedLinks = [link for link in ordered if _filterLink(link,Hm)]
+        return np.array(orderedLinks)
+
+    # Si on veut afficher toutes les liaisons : 
+    orderedLinks = [link for link in ordered]
     return np.array(orderedLinks)
 
 def isDataAvailable(folderPath):
@@ -254,10 +261,16 @@ def _getCenter(img):
     return cY,cX
 
 def _filterLink(link,Hm):
+    # On définit les liaisons aberrantes si la transformation
+    # fait une mise à l'échelle de plus de 50% 
     id1,id2 = link
     H = Hm[id1,id2]
-    s = H[0,0]**2 +H[1,0]**2
-    return np.abs(s-1) < 0.5
+    s2 = H[0,0]**2 +H[1,0]**2
+    #a
+    sMinSquare = 0.25
+    sMaxSquare = 4
+    return sMinSquare<s2 and s2<sMaxSquare
+
 
 
 
