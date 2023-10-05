@@ -49,10 +49,10 @@ class App(tk.Tk):
         topFrame = tk.Frame(self,highlightbackground="black", highlightthickness=1)
         topFrame.pack(side="top",fill=tk.X)
         
-        titleLabel = tk.Label(master=topFrame,text="Numisma",padx=5,pady=5)
+        titleLabel = tk.Label(master=topFrame,text="Numisma v1.1",padx=5,pady=5)
         titleLabel.pack(side="left")
         
-        versionLabel = tk.Label(master=topFrame,text="04/02/2023")
+        versionLabel = tk.Label(master=topFrame,text="05/10/2023")
         versionLabel.pack(side="right")
         
         
