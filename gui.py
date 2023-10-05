@@ -23,6 +23,16 @@ config.read(Path(parentPath,"config.ini"))
 SLIDER_SPEED = int(config["controls"]["sliderSpeed"])
 CONTRAST_THRESHOLD = float(config["calcul"]["contrastThreshold"])
 RATIO = float(config["calcul"]["ratio"])
+USE_PREPROCESSING = bool(int(config["calcul"]["usePreprocessing"]))
+
+preprocessingParam = {
+    "clipLimit" : float(config["calcul"]["clipLimit"]),
+    "gridSize": int(config["calcul"]["gridSize"]),
+    "h" : float(config["calcul"]["h"]),
+}
+
+print(preprocessingParam)
+
 
 USE_FILTER = bool(int(config["graphics"]["useFilter"]))
 ZOOM = int(config["graphics"]["zoom"])
@@ -238,7 +248,7 @@ class ComparePage(tk.Frame):
         self.img1 = cv.imread(str(path1)) # queryImage
         self.img2 = cv.imread(str(path2)) # trainImage
         
-        self.labelCoin.config(text = f"liaison {self.index}/{self.numberLinks} \n {nameList[id1]}   -  {nameList[id2]} \n D = {int(self.controller.D[id1,id2])} ")
+        self.labelCoin.config(text = f"liaison {self.index}/{self.numberLinks} \n {nameList[id1]}   -  {nameList[id2]} \n N = {int(self.controller.D[id1,id2])} ")
         self.slider.set(50)
         
     def updateFromSlider(self,e):
@@ -267,9 +277,6 @@ class ComparePage(tk.Frame):
             self.labelImg.image=img
             
             
-            
-            
-        
         
     def nextLink(self):
         maxIdx = len(self.controller.orderedLinks)
@@ -327,12 +334,19 @@ class ComputationPage(tk.Frame):
         self.timeCounter = 0 
         self.tmpsRestantMin = 0
 
-        nameList, D ,Hm= core.getMatrixFromFolder(self.folderPath,contrastThreshold=CONTRAST_THRESHOLD,ratio=RATIO,callback=self.callbackProgressBar)
+        nameList, D ,Hm= core.getMatrixFromFolder(self.folderPath,
+                                                  contrastThreshold=CONTRAST_THRESHOLD,
+                                                  ratio=RATIO,callback=self.callbackProgressBar,
+                                                  usePreprocessing=USE_PREPROCESSING,
+                                                  preprocessingParam=preprocessingParam)
 
         np.save(Path(self.folderPath,"D.npy"),D)
         np.save(Path(self.folderPath,"Hm.npy"),Hm)
         np.save(Path(self.folderPath,"nameList.npy"),nameList)
-        
+
+        print("SAVING TO CSV")
+
+        core.saveToCsv(self.folderPath,nameList,D)
                     
         nameList, D ,Hm = core.getSavedData(self.folderPath)
         orderedLinks = core.getOrderedLinks(D,Hm,USE_FILTER)

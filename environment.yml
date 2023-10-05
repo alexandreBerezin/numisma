@@ -10,4 +10,5 @@ dependencies:
     - numpy
     - opencv-python
     - pillow
+    - pandas
 prefix: D:\Users\alexa\anaconda3\envs\class

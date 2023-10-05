@@ -2,6 +2,29 @@ import numpy as np
 import cv2 as cv
 from pathlib import Path
 import time
+import pandas as pd
+
+
+def saveToCsv(folderPath,nameList,D):
+    output_filename = 'results.csv'
+    
+    n = len(nameList)
+    # Create a list to store distances and their corresponding pairs
+    distance_pairs = []
+    for i in range(n):
+        for j in range(i):
+            if not np.isnan(D[i, j]):
+                distance_pairs.append((nameList[i], nameList[j], int(D[i, j])))
+    
+    # Sort the distance_pairs by distance in descending order
+    distance_pairs.sort(key=lambda x: x[2], reverse=True)
+    
+    # Create a DataFrame
+    df = pd.DataFrame(distance_pairs, columns=['coin 1', 'coin 2', 'number of matches'])
+    
+    # Write to CSV
+    finalPath = Path(folderPath,output_filename)
+    df.to_csv(finalPath, index=False,sep=';')
 
 def getImgDrawMatch(path1:Path,path2:Path,ratio:float=0.8,contrastThreshold:float=0.02,ransacReprojThreshold:float=10)->np.ndarray:
     """renvoie une image qui montre les points de correspondance entre les deux images. 
@@ -157,7 +180,7 @@ def getSliderImg(img1:np.ndarray,img2:np.ndarray,H:np.ndarray,x:float,l:int)->np
     zoomED = img3RBG[cY-l:cY+l,cX-l:cX+l,:]
     return zoomED
 
-def getMatrixFromFolder(folderPath:Path,contrastThreshold:float,ratio:float,callback:callable=lambda x:None)->tuple[list,np.ndarray,np.ndarray]:
+def getMatrixFromFolder(folderPath:Path,contrastThreshold:float,ratio:float,callback:callable,usePreprocessing:bool,preprocessingParam:dict)->tuple[list,np.ndarray,np.ndarray]:
     """Calcule la matrice des correspondances D[i,j] = nbFeatures(i,j) et renvoie un tableau contenant
     les noms des fichiers, la matrice de correspondance et une matrice contenant les matrices de transformation
 
@@ -181,9 +204,20 @@ def getMatrixFromFolder(folderPath:Path,contrastThreshold:float,ratio:float,call
     total = (N-1)*N/2
     
     kpDesList = []
+
+    clipLimit = preprocessingParam["clipLimit"]
+    gridSize = preprocessingParam["gridSize"]
+    h = preprocessingParam["h"]
+
+    clahe = cv.createCLAHE(clipLimit=clipLimit, tileGridSize=(gridSize,gridSize))
     
     for idx1 in range(N): 
         img1 = cv.imread(str(allPath[idx1]),cv.IMREAD_GRAYSCALE) # queryImage     
+
+        if usePreprocessing:
+            imgHist = clahe.apply(img1)
+            img1 =  cv.fastNlMeansDenoising(imgHist,None,h)
+
         kp1,des1 = getKpDes(img=img1,contrastThreshold=contrastThreshold)
         kpDesList.append([kp1,des1])
         
