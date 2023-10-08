@@ -23,6 +23,7 @@ config.read(Path(parentPath,"config.ini"))
 SLIDER_SPEED = int(config["controls"]["sliderSpeed"])
 CONTRAST_THRESHOLD = float(config["calcul"]["contrastThreshold"])
 RATIO = float(config["calcul"]["ratio"])
+RANSAC_REPROJ_THRESHOLD = float(config["calcul"]["ransacReprojThreshold"])
 USE_PREPROCESSING = bool(int(config["calcul"]["usePreprocessing"]))
 
 preprocessingParam = {
@@ -336,7 +337,9 @@ class ComputationPage(tk.Frame):
 
         nameList, D ,Hm= core.getMatrixFromFolder(self.folderPath,
                                                   contrastThreshold=CONTRAST_THRESHOLD,
-                                                  ratio=RATIO,callback=self.callbackProgressBar,
+                                                  ratio=RATIO,
+                                                  ransacReprojThreshold=RANSAC_REPROJ_THRESHOLD,
+                                                  callback=self.callbackProgressBar,
                                                   usePreprocessing=USE_PREPROCESSING,
                                                   preprocessingParam=preprocessingParam)
 

@@ -92,7 +92,7 @@ def getKpDes(img,contrastThreshold):
     return kp,des
     
     
-def getMatrixAndNumber(kp1,des1,kp2,des2,ratio):
+def getMatrixAndNumber(kp1,des1,kp2,des2,ratio,ransacReprojThreshold):
     bf = cv.BFMatcher()
     matches = bf.knnMatch(des1,des2,k=2)
     # Apply ratio test
@@ -106,13 +106,13 @@ def getMatrixAndNumber(kp1,des1,kp2,des2,ratio):
     src_pts = np.float32( [  kp1[m.queryIdx].pt for m in goodArray]).reshape(-1,1,2)
     dst_pts = np.float32( [  kp2[m.trainIdx].pt for m in goodArray]).reshape(-1,1,2)
     
-    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=10)
+    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold)
     nbMatchedFeatures = np.sum(rigid_mask==1)
 
     return H,nbMatchedFeatures
     
 
-def getMatchedFeaturesNumber(img1:np.ndarray,img2:np.ndarray,contrastThreshold:float,ratio:float)->tuple[np.ndarray,int]:
+def getMatchedFeaturesNumber(img1:np.ndarray,img2:np.ndarray,contrastThreshold:float,ratio:float,ransacReprojThreshold:float)->tuple[np.ndarray,int]:
     """Fonction qui renvoie la matrice de transformation rigide (2*3) et le
     nombre de correspondances entre les deux images
     
@@ -149,7 +149,7 @@ def getMatchedFeaturesNumber(img1:np.ndarray,img2:np.ndarray,contrastThreshold:f
     src_pts = np.float32( [  kp1[m.queryIdx].pt for m in goodArray]).reshape(-1,1,2)
     dst_pts = np.float32( [  kp2[m.trainIdx].pt for m in goodArray]).reshape(-1,1,2)
     
-    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=10)
+    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold)
     nbMatchedFeatures = np.sum(rigid_mask==1)
 
     return H,nbMatchedFeatures
@@ -180,7 +180,7 @@ def getSliderImg(img1:np.ndarray,img2:np.ndarray,H:np.ndarray,x:float,l:int)->np
     zoomED = img3RBG[cY-l:cY+l,cX-l:cX+l,:]
     return zoomED
 
-def getMatrixFromFolder(folderPath:Path,contrastThreshold:float,ratio:float,callback:callable,usePreprocessing:bool,preprocessingParam:dict)->tuple[list,np.ndarray,np.ndarray]:
+def getMatrixFromFolder(folderPath:Path,contrastThreshold:float,ratio:float,ransacReprojThreshold:float,callback:callable,usePreprocessing:bool,preprocessingParam:dict)->tuple[list,np.ndarray,np.ndarray]:
     """Calcule la matrice des correspondances D[i,j] = nbFeatures(i,j) et renvoie un tableau contenant
     les noms des fichiers, la matrice de correspondance et une matrice contenant les matrices de transformation
 
@@ -225,7 +225,7 @@ def getMatrixFromFolder(folderPath:Path,contrastThreshold:float,ratio:float,call
             kp2,des2 = kpDesList[idx2]
             c=c+1
         
-            H,nbFeatures = getMatrixAndNumber(kp1,des1,kp2,des2,ratio=ratio)
+            H,nbFeatures = getMatrixAndNumber(kp1,des1,kp2,des2,ratio=ratio,ransacReprojThreshold=ransacReprojThreshold)
             
             D[idx1,idx2]=nbFeatures
             Hm[idx1,idx2]=H
