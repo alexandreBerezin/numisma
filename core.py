@@ -213,6 +213,13 @@ def getMatrixFromFolder(folderPath:Path,contrastThreshold:float,ratio:float,rans
     
     for idx1 in range(N): 
         img1 = cv.imread(str(allPath[idx1]),cv.IMREAD_GRAYSCALE) # queryImage     
+        # Get the height and width of the image
+        height, _ = img1.shape[:2]
+
+        # Remove the bottom 100 pixels
+        new_height = height - 100
+        img1 = img1[:new_height, :]
+
 
         if usePreprocessing:
             imgHist = clahe.apply(img1)
