@@ -92,7 +92,7 @@ def getKpDes(img,contrastThreshold):
     return kp,des
     
     
-def getMatrixAndNumber(kp1,des1,kp2,des2,ratio,ransacReprojThreshold):
+def getMatrixAndNumber(kp1,des1,kp2,des2,ratio,ransacReprojThreshold,confidence):
     bf = cv.BFMatcher()
     matches = bf.knnMatch(des1,des2,k=2)
     # Apply ratio test
@@ -106,7 +106,7 @@ def getMatrixAndNumber(kp1,des1,kp2,des2,ratio,ransacReprojThreshold):
     src_pts = np.float32( [  kp1[m.queryIdx].pt for m in goodArray]).reshape(-1,1,2)
     dst_pts = np.float32( [  kp2[m.trainIdx].pt for m in goodArray]).reshape(-1,1,2)
     
-    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold)
+    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold,confidence=0.9999)
     nbMatchedFeatures = np.sum(rigid_mask==1)
 
     return H,nbMatchedFeatures
@@ -188,9 +188,11 @@ def getMatrixFromFolder(folderPath:Path,
                         contrastThreshold:float,
                         ratio:float,
                         ransacReprojThreshold:float,
+                        confidence:float,
                         callback:callable,
                         selectDescriptor :int,
                         usePreprocessing:bool,
+                        discradLinkOnScale :float,
                         preprocessingParam:dict)->tuple[list,np.ndarray,np.ndarray]:
     """Calcule la matrice des correspondances D[i,j] = nbFeatures(i,j) et renvoie un tableau contenant
     les noms des fichiers, la matrice de correspondance et une matrice contenant les matrices de transformation
@@ -225,7 +227,7 @@ def getMatrixFromFolder(folderPath:Path,
 
     # if SIFT descriptor
     if selectDescriptor == 0 :
-        sift = cv.SIFT_create(contrastThreshold=contrastThreshold)
+        sift = cv.SIFT_create(contrastThreshold=contrastThreshold,nOctaveLayers=3)
 
 
     # if BRIEF descriptor
@@ -269,11 +271,17 @@ def getMatrixFromFolder(folderPath:Path,
             kp2,des2 = kpDesList[idx2]
             c=c+1
         
-            H,nbFeatures = getMatrixAndNumber(kp1,des1,kp2,des2,ratio=ratio,ransacReprojThreshold=ransacReprojThreshold)
+            H,nbFeatures = getMatrixAndNumber(kp1,des1,kp2,des2,ratio=ratio,ransacReprojThreshold=ransacReprojThreshold,confidence=confidence)
             
+
             D[idx1,idx2]=nbFeatures
             Hm[idx1,idx2]=H
             
+            s = np.sqrt(H[0,0]**2 +H[1,0]**2)
+            # if the scale is too important discard the link
+            if np.abs(s-1)>discradLinkOnScale:
+                D[idx1,idx2]=0
+
             pourcent = 100*c/total
 
             print(f":{pourcent:.2f}%         ",end='\r')

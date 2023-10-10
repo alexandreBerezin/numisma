@@ -26,6 +26,8 @@ RATIO = float(config["calcul"]["ratio"])
 RANSAC_REPROJ_THRESHOLD = float(config["calcul"]["ransacReprojThreshold"])
 USE_PREPROCESSING = bool(int(config["calcul"]["usePreprocessing"]))
 SELECT_DESCRIPTOR = int(config["calcul"]["selectDescriptor"])
+CONFIDENCE = float(config["calcul"]["confidence"]) 
+DISCARD_LINK_ON_SCALE = float(config["calcul"]["discradLinkOnScale"]) 
 
 preprocessingParam = {
     "clipLimit" : float(config["calcul"]["clipLimit"]),
@@ -240,6 +242,8 @@ class ComparePage(tk.Frame):
     def setNewImg(self):
         id1,id2 = self.controller.orderedLinks[self.index]
         self.H = self.controller.Hm[id1,id2]
+
+
         
         folderPath = self.controller.folderPath
         nameList = self.controller.nameList
@@ -251,6 +255,10 @@ class ComparePage(tk.Frame):
         self.img2 = cv.imread(str(path2)) # trainImage
         
         self.labelCoin.config(text = f"liaison {self.index}/{self.numberLinks} \n {nameList[id1]}   -  {nameList[id2]} \n N = {int(self.controller.D[id1,id2])} ")
+        if (int(self.controller.D[id1,id2]) == 0):
+            self.displayMode = 1
+        else:
+            self.displayMode = 0
         self.slider.set(50)
         
     def updateFromSlider(self,e):
@@ -340,9 +348,11 @@ class ComputationPage(tk.Frame):
                                                   contrastThreshold=CONTRAST_THRESHOLD,
                                                   ratio=RATIO,
                                                   ransacReprojThreshold=RANSAC_REPROJ_THRESHOLD,
+                                                  confidence=CONFIDENCE,
                                                   callback=self.callbackProgressBar,
                                                   selectDescriptor=SELECT_DESCRIPTOR,
                                                   usePreprocessing=USE_PREPROCESSING,
+                                                  discradLinkOnScale=DISCARD_LINK_ON_SCALE,
                                                   preprocessingParam=preprocessingParam)
 
         np.save(Path(self.folderPath,"D.npy"),D)
