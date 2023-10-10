@@ -112,7 +112,11 @@ def getMatrixAndNumber(kp1,des1,kp2,des2,ratio,ransacReprojThreshold):
     return H,nbMatchedFeatures
     
 
-def getMatchedFeaturesNumber(img1:np.ndarray,img2:np.ndarray,contrastThreshold:float,ratio:float,ransacReprojThreshold:float)->tuple[np.ndarray,int]:
+def getMatchedFeaturesNumber(img1:np.ndarray,
+                             img2:np.ndarray,
+                             contrastThreshold:float,
+                             ratio:float,
+                             ransacReprojThreshold:float)->tuple[np.ndarray,int]:
     """Fonction qui renvoie la matrice de transformation rigide (2*3) et le
     nombre de correspondances entre les deux images
     
@@ -180,7 +184,14 @@ def getSliderImg(img1:np.ndarray,img2:np.ndarray,H:np.ndarray,x:float,l:int)->np
     zoomED = img3RBG[cY-l:cY+l,cX-l:cX+l,:]
     return zoomED
 
-def getMatrixFromFolder(folderPath:Path,contrastThreshold:float,ratio:float,ransacReprojThreshold:float,callback:callable,usePreprocessing:bool,preprocessingParam:dict)->tuple[list,np.ndarray,np.ndarray]:
+def getMatrixFromFolder(folderPath:Path,
+                        contrastThreshold:float,
+                        ratio:float,
+                        ransacReprojThreshold:float,
+                        callback:callable,
+                        selectDescriptor :int,
+                        usePreprocessing:bool,
+                        preprocessingParam:dict)->tuple[list,np.ndarray,np.ndarray]:
     """Calcule la matrice des correspondances D[i,j] = nbFeatures(i,j) et renvoie un tableau contenant
     les noms des fichiers, la matrice de correspondance et une matrice contenant les matrices de transformation
 
@@ -210,7 +221,21 @@ def getMatrixFromFolder(folderPath:Path,contrastThreshold:float,ratio:float,rans
     h = preprocessingParam["h"]
 
     clahe = cv.createCLAHE(clipLimit=clipLimit, tileGridSize=(gridSize,gridSize))
-    
+
+
+    # if SIFT descriptor
+    if selectDescriptor == 0 :
+        sift = cv.SIFT_create(contrastThreshold=contrastThreshold)
+
+
+    # if BRIEF descriptor
+    if selectDescriptor == 1 :
+        # Initiate FAST detector
+        star = cv.xfeatures2d.StarDetector_create()
+        # Initiate BRIEF extractor
+        brief = cv.xfeatures2d.BriefDescriptorExtractor_create()
+
+        
     for idx1 in range(N): 
         img1 = cv.imread(str(allPath[idx1]),cv.IMREAD_GRAYSCALE) # queryImage     
         # Get the height and width of the image
@@ -225,7 +250,19 @@ def getMatrixFromFolder(folderPath:Path,contrastThreshold:float,ratio:float,rans
             imgHist = clahe.apply(img1)
             img1 =  cv.fastNlMeansDenoising(imgHist,None,h)
 
-        kp1,des1 = getKpDes(img=img1,contrastThreshold=contrastThreshold)
+
+        if selectDescriptor ==0 :
+            kp1, des1 = sift.detectAndCompute(img1,None)
+
+            
+        if selectDescriptor == 1:
+            # find the keypoints with STAR
+            kp = star.detect(img1,None)
+            # compute the descriptors with BRIEF
+            kp1, des1 = brief.compute(img1, kp)
+
+
+
         kpDesList.append([kp1,des1])
         
         for idx2 in range(idx1):

@@ -25,6 +25,7 @@ CONTRAST_THRESHOLD = float(config["calcul"]["contrastThreshold"])
 RATIO = float(config["calcul"]["ratio"])
 RANSAC_REPROJ_THRESHOLD = float(config["calcul"]["ransacReprojThreshold"])
 USE_PREPROCESSING = bool(int(config["calcul"]["usePreprocessing"]))
+SELECT_DESCRIPTOR = int(config["calcul"]["selectDescriptor"])
 
 preprocessingParam = {
     "clipLimit" : float(config["calcul"]["clipLimit"]),
@@ -340,6 +341,7 @@ class ComputationPage(tk.Frame):
                                                   ratio=RATIO,
                                                   ransacReprojThreshold=RANSAC_REPROJ_THRESHOLD,
                                                   callback=self.callbackProgressBar,
+                                                  selectDescriptor=SELECT_DESCRIPTOR,
                                                   usePreprocessing=USE_PREPROCESSING,
                                                   preprocessingParam=preprocessingParam)
 
