@@ -25,7 +25,6 @@ CONTRAST_THRESHOLD = float(config["calcul"]["contrastThreshold"])
 RATIO = float(config["calcul"]["ratio"])
 RANSAC_REPROJ_THRESHOLD = float(config["calcul"]["ransacReprojThreshold"])
 USE_PREPROCESSING = bool(int(config["calcul"]["usePreprocessing"]))
-SELECT_DESCRIPTOR = int(config["calcul"]["selectDescriptor"])
 CONFIDENCE = float(config["calcul"]["confidence"]) 
 DISCARD_LINK_ON_SCALE = float(config["calcul"]["discradLinkOnScale"]) 
 
@@ -350,7 +349,6 @@ class ComputationPage(tk.Frame):
                                                   ransacReprojThreshold=RANSAC_REPROJ_THRESHOLD,
                                                   confidence=CONFIDENCE,
                                                   callback=self.callbackProgressBar,
-                                                  selectDescriptor=SELECT_DESCRIPTOR,
                                                   usePreprocessing=USE_PREPROCESSING,
                                                   discradLinkOnScale=DISCARD_LINK_ON_SCALE,
                                                   preprocessingParam=preprocessingParam)

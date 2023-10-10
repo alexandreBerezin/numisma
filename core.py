@@ -190,7 +190,6 @@ def getMatrixFromFolder(folderPath:Path,
                         ransacReprojThreshold:float,
                         confidence:float,
                         callback:callable,
-                        selectDescriptor :int,
                         usePreprocessing:bool,
                         discradLinkOnScale :float,
                         preprocessingParam:dict)->tuple[list,np.ndarray,np.ndarray]:
@@ -225,17 +224,8 @@ def getMatrixFromFolder(folderPath:Path,
     clahe = cv.createCLAHE(clipLimit=clipLimit, tileGridSize=(gridSize,gridSize))
 
 
-    # if SIFT descriptor
-    if selectDescriptor == 0 :
-        sift = cv.SIFT_create(contrastThreshold=contrastThreshold,nOctaveLayers=3)
+    sift = cv.SIFT_create(contrastThreshold=contrastThreshold)
 
-
-    # if BRIEF descriptor
-    if selectDescriptor == 1 :
-        # Initiate FAST detector
-        star = cv.xfeatures2d.StarDetector_create()
-        # Initiate BRIEF extractor
-        brief = cv.xfeatures2d.BriefDescriptorExtractor_create()
 
         
     for idx1 in range(N): 
@@ -253,16 +243,8 @@ def getMatrixFromFolder(folderPath:Path,
             img1 =  cv.fastNlMeansDenoising(imgHist,None,h)
 
 
-        if selectDescriptor ==0 :
-            kp1, des1 = sift.detectAndCompute(img1,None)
 
-            
-        if selectDescriptor == 1:
-            # find the keypoints with STAR
-            kp = star.detect(img1,None)
-            # compute the descriptors with BRIEF
-            kp1, des1 = brief.compute(img1, kp)
-
+        kp1, des1 = sift.detectAndCompute(img1,None)
 
 
         kpDesList.append([kp1,des1])
