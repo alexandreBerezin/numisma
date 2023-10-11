@@ -42,6 +42,7 @@ ENABLE_PRECISE_UPSCALE = bool(int(config["calcul"]["enablePreciseUpscale"]))
 RATIO = float(config["calcul"]["ratio"])
 RANSAC_REPROJ_THRESHOLD = float(config["calcul"]["ransacReprojThreshold"])
 CONFIDENCE = float(config["calcul"]["confidence"]) 
+MAX_TRIAL = int(config["calcul"]["maxTrial"])
 
 DISCARD_LINK_ON_SCALE = float(config["calcul"]["discradLinkOnScale"]) 
 
@@ -315,6 +316,7 @@ class ComparePage(tk.Frame):
                                     ratio=RATIO,
                                     ransacReprojThreshold=RANSAC_REPROJ_THRESHOLD,
                                     confidence=CONFIDENCE,
+                                    maxTrial=MAX_TRIAL,
                                     callback=lambda a,b:0,
                                     usePreprocessing=USE_PREPROCESSING,
                                     discradLinkOnScale=DISCARD_LINK_ON_SCALE,
@@ -396,6 +398,7 @@ class ComputationPage(tk.Frame):
                                                   ratio=RATIO,
                                                   ransacReprojThreshold=RANSAC_REPROJ_THRESHOLD,
                                                   confidence=CONFIDENCE,
+                                                  maxTrial=MAX_TRIAL,
                                                   callback=self.callbackProgressBar,
                                                   usePreprocessing=USE_PREPROCESSING,
                                                   discradLinkOnScale=DISCARD_LINK_ON_SCALE,

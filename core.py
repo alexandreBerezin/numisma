@@ -4,6 +4,8 @@ from pathlib import Path
 import time
 import pandas as pd
 
+from skimage.transform import EuclideanTransform
+from skimage.measure import ransac
 
 def saveToCsv(folderPath,nameList,D):
     output_filename = 'results.csv'
@@ -92,7 +94,7 @@ def getKpDes(img,contrastThreshold):
     return kp,des
     
     
-def getMatrixAndNumber(kp1,des1,kp2,des2,ratio,ransacReprojThreshold,confidence):
+def getMatrixAndNumber(kp1,des1,kp2,des2,ratio,ransacReprojThreshold,confidence,maxTrial):
     bf = cv.BFMatcher()
     matches = bf.knnMatch(des1,des2,k=2)
     # Apply ratio test
@@ -103,60 +105,20 @@ def getMatrixAndNumber(kp1,des1,kp2,des2,ratio,ransacReprojThreshold,confidence)
     
     # Estimation de la transformation
     goodArray = np.array(good).ravel()
-    src_pts = np.float32( [  kp1[m.queryIdx].pt for m in goodArray]).reshape(-1,1,2)
-    dst_pts = np.float32( [  kp2[m.trainIdx].pt for m in goodArray]).reshape(-1,1,2)
-    
-    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold,confidence=0.9999)
-    nbMatchedFeatures = np.sum(rigid_mask==1)
-
-    return H,nbMatchedFeatures
+    src_pts = np.array( [  kp1[m.queryIdx].pt for m in goodArray])
+    dst_pts = np.array( [  kp2[m.trainIdx].pt for m in goodArray])
     
 
-def getMatchedFeaturesNumber(img1:np.ndarray,
-                             img2:np.ndarray,
-                             contrastThreshold:float,
-                             ratio:float,
-                             ransacReprojThreshold:float)->tuple[np.ndarray,int]:
-    """Fonction qui renvoie la matrice de transformation rigide (2*3) et le
-    nombre de correspondances entre les deux images
+    model_robust, inliers = ransac((src_pts, dst_pts), EuclideanTransform, min_samples=3,
+                               residual_threshold=ransacReprojThreshold, max_trials=maxTrial,stop_probability=confidence)
     
-    La fonction utilise la fonction estimateAffinePartial2D() de OpenCV en particulier la 
-    methode RANSAC pour éliminer les correspondances qui ne sont pas pertinantes au vue d'une
-    transformation rigide
     
-    Args:
-        img1 (np.ndarray): image1 OpenCV RBG
-        img2 (np.ndarray): image1 OpenCV RBG
-        contrastThreshold (float): seuil de contraste (SIFT)
-        ratio (float):ratio pour les bonnes correspondances (SIFT)
+    nbMatchedFeatures = np.sum(inliers)
 
-    Returns:
-        Tuple[np.ndarray,int]: (H,nbMatchedFeatures) 
-    """
-    
-    # Initiate SIFT detector
-    sift = cv.SIFT_create(contrastThreshold=contrastThreshold)
-    # find the keypoints and descriptors with SIFT
-    kp1, des1 = sift.detectAndCompute(img1,None)
-    kp2, des2 = sift.detectAndCompute(img2,None)
-    # BFMatcher with default params
-    bf = cv.BFMatcher()
-    matches = bf.knnMatch(des1,des2,k=2)
-    # Apply ratio test
-    good = []
-    for m,n in matches:
-        if m.distance < ratio*n.distance:
-            good.append([m])
-    
-    # Estimation de la transformation
-    goodArray = np.array(good).ravel()
-    src_pts = np.float32( [  kp1[m.queryIdx].pt for m in goodArray]).reshape(-1,1,2)
-    dst_pts = np.float32( [  kp2[m.trainIdx].pt for m in goodArray]).reshape(-1,1,2)
-    
-    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold)
-    nbMatchedFeatures = np.sum(rigid_mask==1)
+    H= model_robust.params[:2,:]
 
-    return H,nbMatchedFeatures
+    return H ,nbMatchedFeatures
+    
 
 def getSliderImg(img1:np.ndarray,img2:np.ndarray,H:np.ndarray,x:float,l:int)->np.ndarray:
     """Crée une image qui est composé en partie de l'image 1 transformée par la matrice H et de l'image 2
@@ -196,6 +158,7 @@ def getImgDrawMatchv2(path1,
                         ratio:float,
                         ransacReprojThreshold:float,
                         confidence:float,
+                        maxTrial:int,
                         callback:callable,
                         usePreprocessing:bool,
                         discradLinkOnScale :float,
@@ -246,18 +209,25 @@ def getImgDrawMatchv2(path1,
     
     # Estimation de la transformation
     goodArray = np.array(good).ravel()
-    src_pts = np.float32( [  kp1[m.queryIdx].pt for m in goodArray]).reshape(-1,1,2)
-    dst_pts = np.float32( [  kp2[m.trainIdx].pt for m in goodArray]).reshape(-1,1,2)
+    src_pts = np.array( [  kp1[m.queryIdx].pt for m in goodArray])
+    dst_pts = np.array( [  kp2[m.trainIdx].pt for m in goodArray])
     
-    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold,confidence=0.9999)
-    nbMatchedFeatures = np.sum(rigid_mask==1)
+
+    model_robust, inliers = ransac((src_pts, dst_pts), EuclideanTransform, min_samples=10,
+                               residual_threshold=ransacReprojThreshold, max_trials=maxTrial,stop_probability=confidence)
     
-    goodFiltered = [ match for idx,match in enumerate(good) if rigid_mask.ravel()[idx] == 1 ]
+    nbMatchedFeatures = np.sum(inliers)
+
+    H= model_robust.params[:2,:]
+
+    print(nbMatchedFeatures)
+
+    
+    goodFiltered = [ match for idx,match in enumerate(good) if inliers[idx] == 1 ]
 
     img3 = cv.drawMatchesKnn(img1,kp1,img2,kp2,goodFiltered,None,flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-    nbFeatures = np.sum(rigid_mask==1)
     
-    return img3,nbFeatures
+    return img3,nbMatchedFeatures
 
 
 
@@ -271,6 +241,7 @@ def getMatrixFromFolder(folderPath:Path,
                         ratio:float,
                         ransacReprojThreshold:float,
                         confidence:float,
+                        maxTrial:int,
                         callback:callable,
                         usePreprocessing:bool,
                         discradLinkOnScale :float,
@@ -340,7 +311,7 @@ def getMatrixFromFolder(folderPath:Path,
             kp2,des2 = kpDesList[idx2]
             c=c+1
         
-            H,nbFeatures = getMatrixAndNumber(kp1,des1,kp2,des2,ratio=ratio,ransacReprojThreshold=ransacReprojThreshold,confidence=confidence)
+            H,nbFeatures = getMatrixAndNumber(kp1,des1,kp2,des2,ratio=ratio,ransacReprojThreshold=ransacReprojThreshold,confidence=confidence,maxTrial=maxTrial)
             
 
             D[idx1,idx2]=nbFeatures
