@@ -216,8 +216,12 @@ class ComparePage(tk.Frame):
         self.controller.bind('<KeyPress>',self.key_press)
         
     
-    def changeMode(self):
-        if self.displayMode == 0:
+    def changeMode(self,mode):
+        if mode=='d':
+            print("change display mode")
+            self.displayMode = 2
+            self.updateFromSlider(50)
+        elif self.displayMode == 0:
             self.displayMode = 1
             self.updateFromSlider(50)
         else:
@@ -237,16 +241,16 @@ class ComparePage(tk.Frame):
         if e.keysym == "space":
             self.nextLink()
             
+        if e.keysym == "d":
+
+            self.changeMode("d")
+
         if e.keysym == "m":
-            self.changeMode()
+            self.changeMode("_")
             
         if e.keysym == "BackSpace":
             self.beforeLink()
         
-
-
-                
-
         
     def setNewImg(self):
         id1,id2 = self.controller.orderedLinks[self.index]
@@ -258,7 +262,9 @@ class ComparePage(tk.Frame):
         nameList = self.controller.nameList
         
         path1 = Path(folderPath,nameList[id1])
+        self.path1 = path1
         path2 = Path(folderPath,nameList[id2])
+        self.path2 = path2
     
         self.img1 = cv.imread(str(path1)) # queryImage
         self.img2 = cv.imread(str(path2)) # trainImage
@@ -280,7 +286,7 @@ class ComparePage(tk.Frame):
             self.labelImg.configure(image=img)
             self.labelImg.image=img
         
-        else:
+        elif(self.displayMode == 1):
             h = ZOOM2
             a,b,c = np.shape(self.img1)
             img1 = cv.cvtColor(self.img1, cv.COLOR_BGR2RGB)[int(a/2-h/2):int(a/2+h/2),int(a/2-h/2):int(a/2+h/2),:]
@@ -294,6 +300,33 @@ class ComparePage(tk.Frame):
             img = ImageTk.PhotoImage(dst)
             self.labelImg.configure(image=img)
             self.labelImg.image=img
+
+        elif(self.displayMode == 2):
+            print("OK ")
+
+            img1,_ = core.getImgDrawMatchv2(self.path1,
+                                   self.path2,
+                                    nFeatures = N_FEATURES,
+                                    contrastThreshold=CONTRAST_THRESHOLD,
+                                    edgeThreshold = EDGE_THRESHOLD,
+                                    siftSigma = SIFT_SIGMA,
+                                    enablePreciseUpscale = ENABLE_PRECISE_UPSCALE,
+                                    nOctaveLayers = N_OCTAVE_LAYERS,
+                                    ratio=RATIO,
+                                    ransacReprojThreshold=RANSAC_REPROJ_THRESHOLD,
+                                    confidence=CONFIDENCE,
+                                    callback=lambda a,b:0,
+                                    usePreprocessing=USE_PREPROCESSING,
+                                    discradLinkOnScale=DISCARD_LINK_ON_SCALE,
+                                    preprocessingParam=preprocessingParam)
+            
+
+            img = Image.fromarray(img1)
+            img = ImageTk.PhotoImage(img)
+            self.labelImg.configure(image=img)
+            self.labelImg.image=img
+            
+
             
             
         
