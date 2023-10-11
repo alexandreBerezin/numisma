@@ -184,14 +184,16 @@ class ComparePage(tk.Frame):
         self.controller.bind('<KeyPress>',self.key_press)
         
     
-    def changeMode(self):
-        if self.displayMode == 0:
+    def changeMode(self,mode):
+        if mode=='d':
+            self.displayMode = 2
+            self.updateFromSlider(50)
+        elif self.displayMode == 0:
             self.displayMode = 1
             self.updateFromSlider(50)
         else:
             self.displayMode = 0
             self.updateFromSlider(50)
-        
         
     def key_press(self,e):
         if e.keysym == "Right":
@@ -205,12 +207,14 @@ class ComparePage(tk.Frame):
         if e.keysym == "space":
             self.nextLink()
             
+        if e.keysym == "d":
+            self.changeMode("d")
+
         if e.keysym == "m":
-            self.changeMode()
+            self.changeMode("_")
             
         if e.keysym == "BackSpace":
             self.beforeLink()
-        
 
 
                 
@@ -229,7 +233,9 @@ class ComparePage(tk.Frame):
         path2 = Path(folderPath,nameList[id2])
     
         self.img1 = cv.imread(str(path1)) # queryImage
+        self.path1 = path1
         self.img2 = cv.imread(str(path2)) # trainImage
+        self.path2 = path2
         
         self.labelCoin.config(text = f"liaison {self.index}/{self.numberLinks} \n {nameList[id1]}   -  {nameList[id2]} \n N = {int(self.controller.D[id1,id2])} ")
         if (int(self.controller.D[id1,id2]) == 0):
@@ -248,7 +254,7 @@ class ComparePage(tk.Frame):
             self.labelImg.configure(image=img)
             self.labelImg.image=img
         
-        else:
+        elif(self.displayMode == 1):
             h = ZOOM2
             a,b,c = np.shape(self.img1)
             img1 = cv.cvtColor(self.img1, cv.COLOR_BGR2RGB)[int(a/2-h/2):int(a/2+h/2),int(a/2-h/2):int(a/2+h/2),:]
@@ -262,6 +268,31 @@ class ComparePage(tk.Frame):
             img = ImageTk.PhotoImage(dst)
             self.labelImg.configure(image=img)
             self.labelImg.image=img
+
+        elif(self.displayMode == 2):
+            print("OK ")
+
+            img1,_ = core.getImgDrawMatchv2(self.path1,
+                                            self.path2,
+                                                nFeatures = N_FEATURES,
+                                                contrastThreshold=CONTRAST_THRESHOLD,
+                                                edgeThreshold = EDGE_THRESHOLD,
+                                                siftSigma = SIFT_SIGMA,
+                                                enablePreciseUpscale = ENABLE_PRECISE_UPSCALE,
+                                                nOctaveLayers = N_OCTAVE_LAYERS,
+                                                ratio=RATIO,
+                                                ransacReprojThreshold=RANSAC_REPROJ_THRESHOLD,
+                                                maxIters=MAX_ITER,
+                                                usePreprocessing=USE_PREPROCESSING,
+                                                preprocessingParam=preprocessingParam)
+            
+
+            img = Image.fromarray(img1)
+            img = ImageTk.PhotoImage(img)
+            self.labelImg.configure(image=img)
+            self.labelImg.image=img
+            
+
             
             
         
@@ -330,7 +361,7 @@ class ComputationPage(tk.Frame):
                                                   nOctaveLayers = N_OCTAVE_LAYERS,
                                                   ratio=RATIO,
                                                   ransacReprojThreshold=RANSAC_REPROJ_THRESHOLD,
-                                                  confidence=CONFIDENCE,
+                                                  maxIters=MAX_ITER,
                                                   callback=self.callbackProgressBar,
                                                   usePreprocessing=USE_PREPROCESSING,
                                                   discradLinkOnScale=DISCARD_LINK_ON_SCALE,

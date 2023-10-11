@@ -33,7 +33,7 @@ def getKpDes(img,contrastThreshold):
     return kp,des
     
     
-def getMatrixAndNumber(kp1,des1,kp2,des2,ratio,ransacReprojThreshold,confidence):
+def getMatrixAndNumber(kp1,des1,kp2,des2,ratio,ransacReprojThreshold,maxIters:int):
     bf = cv.BFMatcher()
     matches = bf.knnMatch(des1,des2,k=2)
     # Apply ratio test
@@ -47,7 +47,7 @@ def getMatrixAndNumber(kp1,des1,kp2,des2,ratio,ransacReprojThreshold,confidence)
     src_pts = np.float32( [  kp1[m.queryIdx].pt for m in goodArray]).reshape(-1,1,2)
     dst_pts = np.float32( [  kp2[m.trainIdx].pt for m in goodArray]).reshape(-1,1,2)
     
-    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold,confidence=0.9999,maxIters=3000)
+    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold,maxIters=maxIters)
     nbMatchedFeatures = np.sum(rigid_mask==1)
 
     return H,nbMatchedFeatures
@@ -136,10 +136,8 @@ def getImgDrawMatchv2(path1,
                         nOctaveLayers: int,
                         ratio:float,
                         ransacReprojThreshold:float,
-                        confidence:float,
-                        callback:callable,
+                        maxIters :int,
                         usePreprocessing:bool,
-                        discradLinkOnScale :float,
                         preprocessingParam:dict):
     
     clipLimit = preprocessingParam["clipLimit"]
@@ -190,8 +188,7 @@ def getImgDrawMatchv2(path1,
     src_pts = np.float32( [  kp1[m.queryIdx].pt for m in goodArray]).reshape(-1,1,2)
     dst_pts = np.float32( [  kp2[m.trainIdx].pt for m in goodArray]).reshape(-1,1,2)
     
-    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold,confidence=0.9999)
-    nbMatchedFeatures = np.sum(rigid_mask==1)
+    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold,maxIters=maxIters)
     
     goodFiltered = [ match for idx,match in enumerate(good) if rigid_mask.ravel()[idx] == 1 ]
 
@@ -211,7 +208,7 @@ def getMatrixFromFolder(folderPath:Path,
                         nOctaveLayers: int,
                         ratio:float,
                         ransacReprojThreshold:float,
-                        confidence:float,
+                        maxIters:int,
                         callback:callable,
                         usePreprocessing:bool,
                         discradLinkOnScale :float,
@@ -281,7 +278,7 @@ def getMatrixFromFolder(folderPath:Path,
             kp2,des2 = kpDesList[idx2]
             c=c+1
         
-            H,nbFeatures = getMatrixAndNumber(kp1,des1,kp2,des2,ratio=ratio,ransacReprojThreshold=ransacReprojThreshold,confidence=confidence)
+            H,nbFeatures = getMatrixAndNumber(kp1,des1,kp2,des2,ratio=ratio,ransacReprojThreshold=ransacReprojThreshold,maxIters=maxIters)
             
 
             D[idx1,idx2]=nbFeatures
