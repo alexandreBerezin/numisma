@@ -1,7 +1,6 @@
 import numpy as np
 import cv2 as cv
 from pathlib import Path
-import time
 import pandas as pd
 
 
@@ -26,64 +25,6 @@ def saveToCsv(folderPath,nameList,D):
     finalPath = Path(folderPath,output_filename)
     df.to_csv(finalPath, index=False,sep=';')
 
-def getImgDrawMatch(path1:Path,path2:Path,ratio:float=0.8,contrastThreshold:float=0.02,ransacReprojThreshold:float=10)->np.ndarray:
-    """renvoie une image qui montre les points de correspondance entre les deux images. 
-    Utile pour tester l'algorithme.
-
-    Args:
-        path1 (Path): chemin de l'image 1
-        path2 (Path): chemin de l'image 2 
-
-    Returns:
-        np.ndarray: image contenant les correspondances
-    """
-
-    # chargement des images
-    t = time.time()
-    img1 = cv.imread(str(path1),cv.IMREAD_GRAYSCALE) # queryImage
-    img2 = cv.imread(str(path2),cv.IMREAD_GRAYSCALE) # trainImage
-    print(f"chargement images : {time.time()-t}")
-    
-    # Initiate SIFT detector
-    t = time.time()
-    sift = cv.SIFT_create(contrastThreshold=contrastThreshold)
-    # find the keypoints and descriptors with SIFT
-    kp1, des1 = sift.detectAndCompute(img1,None)
-    kp2, des2 = sift.detectAndCompute(img2,None)
-    print(f"SIFT detect : {time.time()-t}")
-    
-    
-    # BFMatcher with default params
-    t = time.time()
-    bf = cv.BFMatcher()
-    matches = bf.knnMatch(des1,des2,k=2)
-    print(f"BF matcher : {time.time()-t}")
-    
-    # Apply ratio test
-    t = time.time()
-    good = []
-    for m,n in matches:
-        if m.distance < ratio*n.distance:
-            good.append([m])
-
-    goodArray = np.array(good).ravel()
-    src_pts = np.float32( [  kp1[m.queryIdx].pt for m in goodArray]).reshape(-1,1,2)
-    dst_pts = np.float32( [  kp2[m.trainIdx].pt for m in goodArray]).reshape(-1,1,2)
-    print(f"Ratio test : {time.time()-t}")
-    
-    # rigid estimation 
-    t = time.time()
-    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold)
-    print(f"Rigid estimation : {time.time()-t}")
-    goodFiltered = [ match for idx,match in enumerate(good) if rigid_mask.ravel()[idx] == 1 ]
-    
-
-
-    img3 = cv.drawMatchesKnn(img1,kp1,img2,kp2,goodFiltered,None,flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-    nbFeatures = np.sum(rigid_mask==1)
-    
-    return img3,nbFeatures
-
 
 def getKpDes(img,contrastThreshold):
     sift = cv.SIFT_create(contrastThreshold=contrastThreshold)
@@ -106,7 +47,7 @@ def getMatrixAndNumber(kp1,des1,kp2,des2,ratio,ransacReprojThreshold,confidence)
     src_pts = np.float32( [  kp1[m.queryIdx].pt for m in goodArray]).reshape(-1,1,2)
     dst_pts = np.float32( [  kp2[m.trainIdx].pt for m in goodArray]).reshape(-1,1,2)
     
-    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold,confidence=0.9999)
+    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold,confidence=0.9999,maxIters=3000)
     nbMatchedFeatures = np.sum(rigid_mask==1)
 
     return H,nbMatchedFeatures
@@ -153,7 +94,7 @@ def getMatchedFeaturesNumber(img1:np.ndarray,
     src_pts = np.float32( [  kp1[m.queryIdx].pt for m in goodArray]).reshape(-1,1,2)
     dst_pts = np.float32( [  kp2[m.trainIdx].pt for m in goodArray]).reshape(-1,1,2)
     
-    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold)
+    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold,maxIters=5)
     nbMatchedFeatures = np.sum(rigid_mask==1)
 
     return H,nbMatchedFeatures

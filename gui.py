@@ -8,56 +8,25 @@ import cv2 as cv
 from PIL import Image,ImageTk
 
 import threading
-import configparser
 
 import time
 import numpy as np
 
-
-
-
-### Lecture des paramètres depuis config.ini
-config = configparser.ConfigParser()
-parentPath = Path(Path(__file__).parent)
+#load config
+from config import *
 
 import core
 
-config.read(Path(parentPath,"config.ini"))
 
-USE_PREPROCESSING = bool(int(config["calcul"]["usePreprocessing"]))
 preprocessingParam = {
-    "clipLimit" : float(config["calcul"]["clipLimit"]),
-    "gridSize": int(config["calcul"]["gridSize"]),
-    "h" : float(config["calcul"]["h"]),
+    "clipLimit" : CLIP_LIMIT,
+    "gridSize": GRID_SIZE,
+    "h" : PREPROCESSING_H,
 }
 
-
-N_FEATURES = int(config["calcul"]["nFeatures"])
-CONTRAST_THRESHOLD = float(config["calcul"]["contrastThreshold"])
-N_OCTAVE_LAYERS = int(config["calcul"]["nOctaveLayers"])
-EDGE_THRESHOLD = float(config["calcul"]["edgeThreshold"])
-SIFT_SIGMA = float(config["calcul"]["siftSigma"])
-ENABLE_PRECISE_UPSCALE = bool(int(config["calcul"]["enablePreciseUpscale"]))
-
-RATIO = float(config["calcul"]["ratio"])
-RANSAC_REPROJ_THRESHOLD = float(config["calcul"]["ransacReprojThreshold"])
-CONFIDENCE = float(config["calcul"]["confidence"]) 
-
-DISCARD_LINK_ON_SCALE = float(config["calcul"]["discradLinkOnScale"]) 
-
-SLIDER_SPEED = int(config["controls"]["sliderSpeed"])
-
-USE_FILTER = bool(int(config["graphics"]["useFilter"]))
-ZOOM = int(config["graphics"]["zoom"])
-ZOOM2 = int(config["graphics"]["zoom2"])
-
-
 class App(tk.Tk):
-
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
-
-
         ### top frame
         topFrame = tk.Frame(self,highlightbackground="black", highlightthickness=1)
         topFrame.pack(side="top",fill=tk.X)
@@ -67,7 +36,6 @@ class App(tk.Tk):
         
         versionLabel = tk.Label(master=topFrame,text="05/10/2023")
         versionLabel.pack(side="right")
-        
         
         ### main container
         self.container = tk.Frame(self,width=100)
