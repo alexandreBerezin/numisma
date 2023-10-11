@@ -289,9 +289,7 @@ def getMatrixFromFolder(folderPath:Path,
             if np.abs(s-1)>discradLinkOnScale:
                 D[idx1,idx2]=0
 
-            pourcent = 100*c/total
 
-            print(f":{pourcent:.2f}%         ",end='\r')
             callback(c,total)
             
     nameList = [path.name for path in allPath]
