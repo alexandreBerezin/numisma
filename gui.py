@@ -13,29 +13,39 @@ import configparser
 import time
 import numpy as np
 
+
+
+
 ### Lecture des paramètres depuis config.ini
 config = configparser.ConfigParser()
 parentPath = Path(Path(__file__).parent)
+
 import core
 
 config.read(Path(parentPath,"config.ini"))
 
-SLIDER_SPEED = int(config["controls"]["sliderSpeed"])
-CONTRAST_THRESHOLD = float(config["calcul"]["contrastThreshold"])
-RATIO = float(config["calcul"]["ratio"])
-RANSAC_REPROJ_THRESHOLD = float(config["calcul"]["ransacReprojThreshold"])
 USE_PREPROCESSING = bool(int(config["calcul"]["usePreprocessing"]))
-CONFIDENCE = float(config["calcul"]["confidence"]) 
-DISCARD_LINK_ON_SCALE = float(config["calcul"]["discradLinkOnScale"]) 
-
 preprocessingParam = {
     "clipLimit" : float(config["calcul"]["clipLimit"]),
     "gridSize": int(config["calcul"]["gridSize"]),
     "h" : float(config["calcul"]["h"]),
 }
 
-print(preprocessingParam)
 
+N_FEATURES = int(config["calcul"]["nFeatures"])
+CONTRAST_THRESHOLD = float(config["calcul"]["contrastThreshold"])
+N_OCTAVE_LAYERS = int(config["calcul"]["nOctaveLayers"])
+EDGE_THRESHOLD = float(config["calcul"]["edgeThreshold"])
+SIFT_SIGMA = float(config["calcul"]["siftSigma"])
+ENABLE_PRECISE_UPSCALE = bool(int(config["calcul"]["enablePreciseUpscale"]))
+
+RATIO = float(config["calcul"]["ratio"])
+RANSAC_REPROJ_THRESHOLD = float(config["calcul"]["ransacReprojThreshold"])
+CONFIDENCE = float(config["calcul"]["confidence"]) 
+
+DISCARD_LINK_ON_SCALE = float(config["calcul"]["discradLinkOnScale"]) 
+
+SLIDER_SPEED = int(config["controls"]["sliderSpeed"])
 
 USE_FILTER = bool(int(config["graphics"]["useFilter"]))
 ZOOM = int(config["graphics"]["zoom"])
@@ -344,7 +354,12 @@ class ComputationPage(tk.Frame):
         self.tmpsRestantMin = 0
 
         nameList, D ,Hm= core.getMatrixFromFolder(self.folderPath,
+                                                  nFeatures = N_FEATURES,
                                                   contrastThreshold=CONTRAST_THRESHOLD,
+                                                  edgeThreshold = EDGE_THRESHOLD,
+                                                  siftSigma = SIFT_SIGMA,
+                                                  enablePreciseUpscale = ENABLE_PRECISE_UPSCALE,
+                                                  nOctaveLayers = N_OCTAVE_LAYERS,
                                                   ratio=RATIO,
                                                   ransacReprojThreshold=RANSAC_REPROJ_THRESHOLD,
                                                   confidence=CONFIDENCE,

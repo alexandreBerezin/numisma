@@ -184,8 +184,90 @@ def getSliderImg(img1:np.ndarray,img2:np.ndarray,H:np.ndarray,x:float,l:int)->np
     zoomED = img3RBG[cY-l:cY+l,cX-l:cX+l,:]
     return zoomED
 
-def getMatrixFromFolder(folderPath:Path,
+
+def getImgDrawMatchv2(path1,
+                      path2,
+                        nFeatures:int,
                         contrastThreshold:float,
+                        edgeThreshold :float,
+                        siftSigma : float,
+                        enablePreciseUpscale : bool,
+                        nOctaveLayers: int,
+                        ratio:float,
+                        ransacReprojThreshold:float,
+                        confidence:float,
+                        callback:callable,
+                        usePreprocessing:bool,
+                        discradLinkOnScale :float,
+                        preprocessingParam:dict):
+    
+    clipLimit = preprocessingParam["clipLimit"]
+    gridSize = preprocessingParam["gridSize"]
+    h = preprocessingParam["h"]
+
+    clahe = cv.createCLAHE(clipLimit=clipLimit, tileGridSize=(gridSize,gridSize))
+    
+    sift = cv.SIFT_create(nfeatures=nFeatures,
+                        nOctaveLayers=nOctaveLayers,    # Number of layers in each octave
+                        contrastThreshold=contrastThreshold,    # Threshold to filter out weak features
+                        edgeThreshold=edgeThreshold,    # Threshold for edge rejection
+                        sigma=siftSigma,    # Standard deviation for Gaussian smoothing
+                        enable_precise_upscale  = enablePreciseUpscale
+            )
+    
+    img1 = cv.imread(str(path1),cv.IMREAD_GRAYSCALE) # queryImage     
+    img2 = cv.imread(str(path2),cv.IMREAD_GRAYSCALE) # queryImage    
+    # Get the height and width of the image
+    height, _ = img1.shape[:2]
+
+    # Remove the bottom 100 pixels
+    new_height = height - 100
+    img1 = img1[:new_height, :]
+    img2 = img2[:new_height, :]
+
+
+    if usePreprocessing:
+        imgHist = clahe.apply(img1)
+        img1 =  cv.fastNlMeansDenoising(imgHist,None,h)
+
+        imgHist = clahe.apply(img2)
+        img2 =  cv.fastNlMeansDenoising(imgHist,None,h)
+
+    kp1, des1 = sift.detectAndCompute(img1,None)
+    kp2, des2 = sift.detectAndCompute(img2,None)
+    
+    bf = cv.BFMatcher()
+    matches = bf.knnMatch(des1,des2,k=2)
+    # Apply ratio test
+    good = []
+    for m,n in matches:
+        if m.distance < ratio*n.distance:
+            good.append([m])
+    
+    # Estimation de la transformation
+    goodArray = np.array(good).ravel()
+    src_pts = np.float32( [  kp1[m.queryIdx].pt for m in goodArray]).reshape(-1,1,2)
+    dst_pts = np.float32( [  kp2[m.trainIdx].pt for m in goodArray]).reshape(-1,1,2)
+    
+    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold,confidence=0.9999)
+    nbMatchedFeatures = np.sum(rigid_mask==1)
+    
+    goodFiltered = [ match for idx,match in enumerate(good) if rigid_mask.ravel()[idx] == 1 ]
+
+    img3 = cv.drawMatchesKnn(img1,kp1,img2,kp2,goodFiltered,None,flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+    nbFeatures = np.sum(rigid_mask==1)
+    
+    return img3,nbFeatures
+
+
+
+def getMatrixFromFolder(folderPath:Path,
+                        nFeatures:int,
+                        contrastThreshold:float,
+                        edgeThreshold :float,
+                        siftSigma : float,
+                        enablePreciseUpscale : bool,
+                        nOctaveLayers: int,
                         ratio:float,
                         ransacReprojThreshold:float,
                         confidence:float,
@@ -224,8 +306,13 @@ def getMatrixFromFolder(folderPath:Path,
     clahe = cv.createCLAHE(clipLimit=clipLimit, tileGridSize=(gridSize,gridSize))
 
 
-    sift = cv.SIFT_create(contrastThreshold=contrastThreshold)
-
+    sift = cv.SIFT_create(nfeatures=nFeatures,
+                            nOctaveLayers=nOctaveLayers,    # Number of layers in each octave
+                            contrastThreshold=contrastThreshold,    # Threshold to filter out weak features
+                            edgeThreshold=edgeThreshold,    # Threshold for edge rejection
+                            sigma=siftSigma,    # Standard deviation for Gaussian smoothing
+                            enable_precise_upscale  = enablePreciseUpscale
+                )
 
         
     for idx1 in range(N): 
