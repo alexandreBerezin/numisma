@@ -46,6 +46,8 @@ def getMatrixAndNumber(kp1,des1,kp2,des2,ratio,ransacReprojThreshold,maxIters:in
     H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold,maxIters=maxIters)
     nbMatchedFeatures = np.sum(rigid_mask==1)
 
+    del bf
+
     return H,nbMatchedFeatures
     
 
@@ -148,37 +150,6 @@ def getImgDrawMatchv2(path1,
     
     return img3,nbFeatures
 
-def getKpDes(path:str,h:float,usePreprocessing:bool,clipLimit,gridSize,nFeatures,nOctaveLayers,contrastThreshold,edgeThreshold,
-             siftSigma,enablePreciseUpscale):
-
-    clahe = cv.createCLAHE(clipLimit=clipLimit, tileGridSize=(gridSize,gridSize))
-
-
-    sift = cv.SIFT_create(nfeatures=nFeatures,
-                            nOctaveLayers=nOctaveLayers,    # Number of layers in each octave
-                            contrastThreshold=contrastThreshold,    # Threshold to filter out weak features
-                            edgeThreshold=edgeThreshold,    # Threshold for edge rejection
-                            sigma=siftSigma,    # Standard deviation for Gaussian smoothing
-                            enable_precise_upscale  = enablePreciseUpscale
-                )
-
-    img = cv.imread(path,cv.IMREAD_GRAYSCALE) # queryImage     
-    # Get the height and width of the image
-    height, _ = img.shape[:2]
-
-    # Remove the bottom 100 pixels
-    new_height = height - 100
-    img = img[:new_height, :]
-
-
-    if usePreprocessing:
-        imgHist = clahe.apply(img)
-        img =  cv.fastNlMeansDenoising(imgHist,None,h)
-
-    kp1, des1 = sift.detectAndCompute(img,None)
-    onlyPoints = [kp.pt for kp in kp1]
-
-    return [onlyPoints,des1]
 
 def getMatrixFromFolder(folderPath:Path,
                         nFeatures:int,
@@ -222,9 +193,43 @@ def getMatrixFromFolder(folderPath:Path,
 # path:str,h:float,usePreprocessing:bool ,clipLimit,gridSize,nFeatures,nOctaveLayers,contrastThreshold,edgeThreshold,
             # siftSigma,enablePreciseUpscale
 
-    args = [(str(allPath[id]) , h,usePreprocessing,clipLimit,gridSize,nFeatures,nOctaveLayers,contrastThreshold,edgeThreshold,siftSigma,enablePreciseUpscale) for id in range(N)]
-    with Pool(processes=numProcessors) as pool:       
-        kpDesList = pool.starmap(getKpDes, args)    
+    
+    clahe = cv.createCLAHE(clipLimit=clipLimit, tileGridSize=(gridSize,gridSize))
+
+
+    sift = cv.SIFT_create(nfeatures=nFeatures,
+                            nOctaveLayers=nOctaveLayers,    # Number of layers in each octave
+                            contrastThreshold=contrastThreshold,    # Threshold to filter out weak features
+                            edgeThreshold=edgeThreshold,    # Threshold for edge rejection
+                            sigma=siftSigma,    # Standard deviation for Gaussian smoothing
+                            enable_precise_upscale  = enablePreciseUpscale
+                )
+
+
+    for id in range(N):
+        path = str(allPath[id])
+
+        img = cv.imread(path,cv.IMREAD_GRAYSCALE) # queryImage     
+        # Get the height and width of the image
+        height, _ = img.shape[:2]
+
+        # Remove the bottom 100 pixels
+        new_height = height - 100
+        img = img[:new_height, :]
+
+
+        if usePreprocessing:
+            imgHist = clahe.apply(img)
+            img =  cv.fastNlMeansDenoising(imgHist,None,h)
+
+
+        kp1, des1 = sift.detectAndCompute(img,None)
+        onlyPoints = [kp.pt for kp in kp1]
+
+        kpDesList.append([onlyPoints,des1])
+
+        print(f"preprocessing {id}/{N}",end='\r')
+
 
         
     ## Calcul 
@@ -274,6 +279,8 @@ def getRowOfDistance(idx1,kpDesList,ratio,ransacReprojThreshold,maxIters):
             D.append(nbFeatures)
 
         Hm.append(H)
+
+    print(f"index {idx1} fini")
     return (D,Hm)
 
 def getOrderedLinks(D,Hm,useFilter:bool):
