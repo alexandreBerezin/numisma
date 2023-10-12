@@ -26,6 +26,9 @@ RATIO = 0.9
 MAX_ITER = 5000
 
 
+NUM_PROCESSORS = 2
+
+
 
 ######Controls ######
 SLIDER_SPEED=3

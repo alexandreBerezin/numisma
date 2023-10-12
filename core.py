@@ -2,6 +2,7 @@ import numpy as np
 import cv2 as cv
 from pathlib import Path
 import pandas as pd
+from multiprocessing import Pool
 
 
 def saveToCsv(folderPath,nameList,D):
@@ -26,13 +27,7 @@ def saveToCsv(folderPath,nameList,D):
     df.to_csv(finalPath, index=False,sep=';')
 
 
-def getKpDes(img,contrastThreshold):
-    sift = cv.SIFT_create(contrastThreshold=contrastThreshold)
-    # find the keypoints and descriptors with SIFT
-    kp, des = sift.detectAndCompute(img,None)
-    return kp,des
-    
-    
+       
 def getMatrixAndNumber(kp1,des1,kp2,des2,ratio,ransacReprojThreshold,maxIters:int):
     bf = cv.BFMatcher()
     matches = bf.knnMatch(des1,des2,k=2)
@@ -44,8 +39,9 @@ def getMatrixAndNumber(kp1,des1,kp2,des2,ratio,ransacReprojThreshold,maxIters:in
     
     # Estimation de la transformation
     goodArray = np.array(good).ravel()
-    src_pts = np.float32( [  kp1[m.queryIdx].pt for m in goodArray]).reshape(-1,1,2)
-    dst_pts = np.float32( [  kp2[m.trainIdx].pt for m in goodArray]).reshape(-1,1,2)
+    src_pts = np.float32( [  kp1[m.queryIdx] for m in goodArray]).reshape(-1,1,2)
+    dst_pts = np.float32( [  kp2[m.trainIdx] for m in goodArray]).reshape(-1,1,2)
+
     
     H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold,maxIters=maxIters)
     nbMatchedFeatures = np.sum(rigid_mask==1)
@@ -53,51 +49,6 @@ def getMatrixAndNumber(kp1,des1,kp2,des2,ratio,ransacReprojThreshold,maxIters:in
     return H,nbMatchedFeatures
     
 
-def getMatchedFeaturesNumber(img1:np.ndarray,
-                             img2:np.ndarray,
-                             contrastThreshold:float,
-                             ratio:float,
-                             ransacReprojThreshold:float)->tuple[np.ndarray,int]:
-    """Fonction qui renvoie la matrice de transformation rigide (2*3) et le
-    nombre de correspondances entre les deux images
-    
-    La fonction utilise la fonction estimateAffinePartial2D() de OpenCV en particulier la 
-    methode RANSAC pour éliminer les correspondances qui ne sont pas pertinantes au vue d'une
-    transformation rigide
-    
-    Args:
-        img1 (np.ndarray): image1 OpenCV RBG
-        img2 (np.ndarray): image1 OpenCV RBG
-        contrastThreshold (float): seuil de contraste (SIFT)
-        ratio (float):ratio pour les bonnes correspondances (SIFT)
-
-    Returns:
-        Tuple[np.ndarray,int]: (H,nbMatchedFeatures) 
-    """
-    
-    # Initiate SIFT detector
-    sift = cv.SIFT_create(contrastThreshold=contrastThreshold)
-    # find the keypoints and descriptors with SIFT
-    kp1, des1 = sift.detectAndCompute(img1,None)
-    kp2, des2 = sift.detectAndCompute(img2,None)
-    # BFMatcher with default params
-    bf = cv.BFMatcher()
-    matches = bf.knnMatch(des1,des2,k=2)
-    # Apply ratio test
-    good = []
-    for m,n in matches:
-        if m.distance < ratio*n.distance:
-            good.append([m])
-    
-    # Estimation de la transformation
-    goodArray = np.array(good).ravel()
-    src_pts = np.float32( [  kp1[m.queryIdx].pt for m in goodArray]).reshape(-1,1,2)
-    dst_pts = np.float32( [  kp2[m.trainIdx].pt for m in goodArray]).reshape(-1,1,2)
-    
-    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold,maxIters=5)
-    nbMatchedFeatures = np.sum(rigid_mask==1)
-
-    return H,nbMatchedFeatures
 
 def getSliderImg(img1:np.ndarray,img2:np.ndarray,H:np.ndarray,x:float,l:int)->np.ndarray:
     """Crée une image qui est composé en partie de l'image 1 transformée par la matrice H et de l'image 2
@@ -197,7 +148,37 @@ def getImgDrawMatchv2(path1,
     
     return img3,nbFeatures
 
+def getKpDes(path:str,h:float,usePreprocessing:bool,clipLimit,gridSize,nFeatures,nOctaveLayers,contrastThreshold,edgeThreshold,
+             siftSigma,enablePreciseUpscale):
 
+    clahe = cv.createCLAHE(clipLimit=clipLimit, tileGridSize=(gridSize,gridSize))
+
+
+    sift = cv.SIFT_create(nfeatures=nFeatures,
+                            nOctaveLayers=nOctaveLayers,    # Number of layers in each octave
+                            contrastThreshold=contrastThreshold,    # Threshold to filter out weak features
+                            edgeThreshold=edgeThreshold,    # Threshold for edge rejection
+                            sigma=siftSigma,    # Standard deviation for Gaussian smoothing
+                            enable_precise_upscale  = enablePreciseUpscale
+                )
+
+    img = cv.imread(path,cv.IMREAD_GRAYSCALE) # queryImage     
+    # Get the height and width of the image
+    height, _ = img.shape[:2]
+
+    # Remove the bottom 100 pixels
+    new_height = height - 100
+    img = img[:new_height, :]
+
+
+    if usePreprocessing:
+        imgHist = clahe.apply(img)
+        img =  cv.fastNlMeansDenoising(imgHist,None,h)
+
+    kp1, des1 = sift.detectAndCompute(img,None)
+    onlyPoints = [kp.pt for kp in kp1]
+
+    return [onlyPoints,des1]
 
 def getMatrixFromFolder(folderPath:Path,
                         nFeatures:int,
@@ -212,7 +193,8 @@ def getMatrixFromFolder(folderPath:Path,
                         callback:callable,
                         usePreprocessing:bool,
                         discradLinkOnScale :float,
-                        preprocessingParam:dict)->tuple[list,np.ndarray,np.ndarray]:
+                        preprocessingParam:dict,
+                        numProcessors:int)->tuple[list,np.ndarray,np.ndarray]:
     """Calcule la matrice des correspondances D[i,j] = nbFeatures(i,j) et renvoie un tableau contenant
     les noms des fichiers, la matrice de correspondance et une matrice contenant les matrices de transformation
 
@@ -227,74 +209,72 @@ def getMatrixFromFolder(folderPath:Path,
     """
     allPath = sorted(list(folderPath.glob("*.jpg")))
     N = len(allPath)
-    D = np.empty((N,N))
-    D[:] = np.NaN
-    
-    Hm = np.zeros((N,N,2,3))
-    c=0
-    
-    total = (N-1)*N/2
-    
+
     kpDesList = []
 
     clipLimit = preprocessingParam["clipLimit"]
     gridSize = preprocessingParam["gridSize"]
     h = preprocessingParam["h"]
 
-    clahe = cv.createCLAHE(clipLimit=clipLimit, tileGridSize=(gridSize,gridSize))
 
+# img1 = cv.imread(str(allPath[idx1]),cv.IMREAD_GRAYSCALE) # queryImage    
+# 
+# path:str,h:float,usePreprocessing:bool ,clipLimit,gridSize,nFeatures,nOctaveLayers,contrastThreshold,edgeThreshold,
+            # siftSigma,enablePreciseUpscale
 
-    sift = cv.SIFT_create(nfeatures=nFeatures,
-                            nOctaveLayers=nOctaveLayers,    # Number of layers in each octave
-                            contrastThreshold=contrastThreshold,    # Threshold to filter out weak features
-                            edgeThreshold=edgeThreshold,    # Threshold for edge rejection
-                            sigma=siftSigma,    # Standard deviation for Gaussian smoothing
-                            enable_precise_upscale  = enablePreciseUpscale
-                )
+    args = [(str(allPath[id]) , h,usePreprocessing,clipLimit,gridSize,nFeatures,nOctaveLayers,contrastThreshold,edgeThreshold,siftSigma,enablePreciseUpscale) for id in range(N)]
+    with Pool(processes=numProcessors) as pool:       
+        kpDesList = pool.starmap(getKpDes, args)    
 
         
-    for idx1 in range(N): 
-        img1 = cv.imread(str(allPath[idx1]),cv.IMREAD_GRAYSCALE) # queryImage     
-        # Get the height and width of the image
-        height, _ = img1.shape[:2]
-
-        # Remove the bottom 100 pixels
-        new_height = height - 100
-        img1 = img1[:new_height, :]
+    ## Calcul 
+    args = [ (idx ,kpDesList,ratio, ransacReprojThreshold,maxIters) for idx in range(1,N)]
+    with Pool(processes=numProcessors) as pool:       
+        DAndHInLines = pool.starmap(getRowOfDistance, args)    
 
 
-        if usePreprocessing:
-            imgHist = clahe.apply(img1)
-            img1 =  cv.fastNlMeansDenoising(imgHist,None,h)
-
-
-
-        kp1, des1 = sift.detectAndCompute(img1,None)
-
-
-        kpDesList.append([kp1,des1])
-        
+    DLines = [resIter[0] for resIter in DAndHInLines]    
+    D = np.empty((N,N))
+    D[:] = np.NaN
+    for idx1 in range(1,N):
         for idx2 in range(idx1):
-            kp2,des2 = kpDesList[idx2]
-            c=c+1
-        
-            H,nbFeatures = getMatrixAndNumber(kp1,des1,kp2,des2,ratio=ratio,ransacReprojThreshold=ransacReprojThreshold,maxIters=maxIters)
-            
+                D[idx1,idx2] = DLines[idx1-1][idx2]
 
-            D[idx1,idx2]=nbFeatures
-            Hm[idx1,idx2]=H
-            
-            s = np.sqrt(H[0,0]**2 +H[1,0]**2)
-            # if the scale is too important discard the link
-            if np.abs(s-1)>discradLinkOnScale:
-                D[idx1,idx2]=0
-
-
-            callback(c,total)
+    
+    HLines = [resIter[1] for resIter in DAndHInLines]
+    Hm = np.zeros((N,N,2,3))
+    for idx1 in range(1,N):
+        for idx2 in range(idx1):
+                Hm[idx1,idx2] = HLines[idx1-1][idx2]
+    
             
     nameList = [path.name for path in allPath]
             
     return nameList,D,Hm
+
+
+def getRowOfDistance(idx1,kpDesList,ratio,ransacReprojThreshold,maxIters):
+    # calcule une seule ligne (utilisé pour multiprocessing)
+    # renvoie une seule ligne de D et une seule ligne de H dans un tuple
+    # return (D,H)
+
+    D = []
+    Hm = []
+    kp1,des1 = kpDesList[idx1]
+    for idx2 in range(idx1):
+        kp2,des2 = kpDesList[idx2]
+    
+        H,nbFeatures = getMatrixAndNumber(kp1,des1,kp2,des2,ratio=ratio,ransacReprojThreshold=ransacReprojThreshold,maxIters=maxIters)
+        
+        s = np.sqrt(H[0,0]**2 +H[1,0]**2)
+        # if the scale is too important discard the link
+        if np.abs(s-1)>0.25:
+            D.append(0)
+        else:
+            D.append(nbFeatures)
+
+        Hm.append(H)
+    return (D,Hm)
 
 def getOrderedLinks(D,Hm,useFilter:bool):
     
