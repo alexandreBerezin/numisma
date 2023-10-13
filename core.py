@@ -5,7 +5,7 @@ import pandas as pd
 from multiprocessing import Pool
 
 
-def saveToCsv(folderPath,nameList,D):
+def saveToCsv(folderPath,nameList:list,D:np.ndarray):
     output_filename = 'results.csv'
     
     n = len(nameList)
@@ -165,7 +165,7 @@ def getMatrixFromFolder(folderPath:Path,
                         usePreprocessing:bool,
                         discradLinkOnScale :float,
                         preprocessingParam:dict,
-                        numProcessors:int)->tuple[list,np.ndarray,np.ndarray]:
+                        numProcessors:int):
     """Calcule la matrice des correspondances D[i,j] = nbFeatures(i,j) et renvoie un tableau contenant
     les noms des fichiers, la matrice de correspondance et une matrice contenant les matrices de transformation
 
@@ -186,12 +186,6 @@ def getMatrixFromFolder(folderPath:Path,
     clipLimit = preprocessingParam["clipLimit"]
     gridSize = preprocessingParam["gridSize"]
     h = preprocessingParam["h"]
-
-
-# img1 = cv.imread(str(allPath[idx1]),cv.IMREAD_GRAYSCALE) # queryImage    
-# 
-# path:str,h:float,usePreprocessing:bool ,clipLimit,gridSize,nFeatures,nOctaveLayers,contrastThreshold,edgeThreshold,
-            # siftSigma,enablePreciseUpscale
 
     
     clahe = cv.createCLAHE(clipLimit=clipLimit, tileGridSize=(gridSize,gridSize))
@@ -230,14 +224,38 @@ def getMatrixFromFolder(folderPath:Path,
 
         print(f"preprocessing {id}/{N}",end='\r')
 
+    nKeyPoints = np.array([len(kpDes[1]) for kpDes in kpDesList])
+    print(f"nombre de moyen de kp par image : {np.mean(nKeyPoints)}")
+    
+    print("preprocessing DONE")
 
-        
+    asincResults = []
+    
+    c= 0
+
+    def resultCallback(res,idRow):
+        nonlocal c  # Declare c as a global variable
+        c = c+ idRow
+        print(c/total*100)
+        asincResults.append((res,idRow))
+    
     ## Calcul 
+
+    total = N*(N-1)/2
+
     args = [ (idx ,kpDesList,ratio, ransacReprojThreshold,maxIters) for idx in range(1,N)]
-    with Pool(processes=numProcessors) as pool:       
-        DAndHInLines = pool.starmap(getRowOfDistance, args)    
+    with Pool(processes=numProcessors) as pool:
+        for arg in args:
+            pool.apply_async(getRowOfDistance, arg, callback=lambda res, idRow=arg[0]: resultCallback(res, idRow))
 
+        pool.close()
+        pool.join()
 
+    # tri du calcul asynchrone
+    asincResults.sort(key=lambda x: x[1])
+    DAndHInLines = [result[0] for result in asincResults]
+
+    ## reconstruction de la matrice
     DLines = [resIter[0] for resIter in DAndHInLines]    
     D = np.empty((N,N))
     D[:] = np.NaN
@@ -280,10 +298,9 @@ def getRowOfDistance(idx1,kpDesList,ratio,ransacReprojThreshold,maxIters):
 
         Hm.append(H)
 
-    print(f"index {idx1} fini")
     return (D,Hm)
 
-def getOrderedLinks(D,Hm,useFilter:bool):
+def getOrderedLinks(D,Hm):
     
     dim = np.shape(D)
     N,_ =dim 
@@ -291,11 +308,6 @@ def getOrderedLinks(D,Hm,useFilter:bool):
     nbComparaison = int(N*(N-1)/2)
 
     ordered = np.dstack(np.unravel_index(np.argsort(-Dravel),dim))[0][:nbComparaison]
-
-    # un filtre partiel pour éviter d'afficher des liaisons aberrantes 
-    if useFilter:
-        orderedLinks = [link for link in ordered if _filterLink(link,Hm)]
-        return np.array(orderedLinks)
 
     # Si on veut afficher toutes les liaisons : 
     orderedLinks = [link for link in ordered]
@@ -337,18 +349,6 @@ def _getCenter(img):
     
     cY,cX = int(center[0]),int(center[1])
     return cY,cX
-
-def _filterLink(link,Hm):
-    # On définit les liaisons aberrantes si la transformation
-    # fait une mise à l'échelle de plus de 50% 
-    id1,id2 = link
-    H = Hm[id1,id2]
-    s2 = H[0,0]**2 +H[1,0]**2
-    #a
-    sMinSquare = 0.25
-    sMaxSquare = 4
-    return sMinSquare<s2 and s2<sMaxSquare
-
 
 
 

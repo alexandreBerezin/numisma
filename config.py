@@ -11,8 +11,8 @@ PREPROCESSING_H = 22
 #utilisé pour SIFT
 N_FEATURES = 0
 CONTRAST_THRESHOLD = 0.05
-EDGE_THRESHOLD  = 40
-SIFT_SIGMA = 1.2
+EDGE_THRESHOLD  = 30
+SIFT_SIGMA = 1
 ENABLE_PRECISE_UPSCALE = 1
 N_OCTAVE_LAYERS = 8
 
@@ -21,7 +21,7 @@ N_OCTAVE_LAYERS = 8
 DISCARD_LINK_ON_SCALE = 0.25
 
 ## Correspondance points d'interêts
-RANSAC_REPROJ_THRESHOLD = 4
+RANSAC_REPROJ_THRESHOLD = 5
 RATIO = 0.9
 MAX_ITER = 5000
 
@@ -36,5 +36,4 @@ SLIDER_SPEED=3
 ###### Graphics ######
 ZOOM = 250
 ZOOM2 = 500
-# si 1, filtre les liaisons abec les valeurs aberrantes
-USE_FILTER = 0
+

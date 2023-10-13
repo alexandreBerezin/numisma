@@ -123,7 +123,7 @@ class StartPage(tk.Frame):
                 print("data available")
             
                 nameList, D ,Hm = core.getSavedData(folderPath)
-                orderedLinks = core.getOrderedLinks(D,Hm,USE_FILTER)
+                orderedLinks = core.getOrderedLinks(D,Hm)
                 
                 self.controller.updateParam(nameList, D ,Hm,orderedLinks,folderPath)
                 
@@ -377,7 +377,7 @@ class ComputationPage(tk.Frame):
         core.saveToCsv(self.folderPath,nameList,D)
                     
         nameList, D ,Hm = core.getSavedData(self.folderPath)
-        orderedLinks = core.getOrderedLinks(D,Hm,USE_FILTER)
+        orderedLinks = core.getOrderedLinks(D,Hm)
         
         self.controller.updateParam(nameList, D ,Hm,orderedLinks,self.folderPath)
         
