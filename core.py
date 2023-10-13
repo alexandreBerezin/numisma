@@ -29,8 +29,17 @@ def saveToCsv(folderPath,nameList:list,D:np.ndarray):
 
        
 def getMatrixAndNumber(kp1,des1,kp2,des2,ratio,ransacReprojThreshold,maxIters:int):
+    
+
+    # flann = cv.FlannBasedMatcher()
+
+    # # Perform matching
+    # matches = flann.knnMatch(des1, des2, k=2)
+        
     bf = cv.BFMatcher()
     matches = bf.knnMatch(des1,des2,k=2)
+
+
     # Apply ratio test
     good = []
     for m,n in matches:
@@ -46,7 +55,7 @@ def getMatrixAndNumber(kp1,des1,kp2,des2,ratio,ransacReprojThreshold,maxIters:in
     H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold,maxIters=maxIters)
     nbMatchedFeatures = np.sum(rigid_mask==1)
 
-    del bf
+    #del flann
 
     return H,nbMatchedFeatures
     
@@ -257,6 +266,7 @@ def getMatrixFromFolder(folderPath:Path,
 
     ## reconstruction de la matrice
     DLines = [resIter[0] for resIter in DAndHInLines]    
+    print(DLines)
     D = np.empty((N,N))
     D[:] = np.NaN
     for idx1 in range(1,N):

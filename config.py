@@ -12,9 +12,9 @@ PREPROCESSING_H = 22
 N_FEATURES = 0
 CONTRAST_THRESHOLD = 0.05
 EDGE_THRESHOLD  = 30
-SIFT_SIGMA = 1
+SIFT_SIGMA = 1.1
 ENABLE_PRECISE_UPSCALE = 1
-N_OCTAVE_LAYERS = 8
+N_OCTAVE_LAYERS = 3
 
 # supprime les liaisons qui ont une transformation aberrante
 # plus la valeur est petite plus on filtre les liaisons
