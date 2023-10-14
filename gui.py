@@ -364,7 +364,6 @@ class ComputationPage(tk.Frame):
                                                   maxIters=MAX_ITER,
                                                   callback=self.callbackProgressBar,
                                                   usePreprocessing=USE_PREPROCESSING,
-                                                  discradLinkOnScale=DISCARD_LINK_ON_SCALE,
                                                   numProcessors=NUM_PROCESSORS,
                                                   preprocessingParam=preprocessingParam)
 

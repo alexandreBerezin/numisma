@@ -3,161 +3,15 @@ import cv2 as cv
 from pathlib import Path
 import pandas as pd
 from multiprocessing import Pool
+import threading
+import time
+import os
+import shutil
+import datetime
 
 
-def saveToCsv(folderPath,nameList:list,D:np.ndarray):
-    output_filename = 'results.csv'
-    
-    n = len(nameList)
-    # Create a list to store distances and their corresponding pairs
-    distance_pairs = []
-    for i in range(n):
-        for j in range(i):
-            if not np.isnan(D[i, j]):
-                distance_pairs.append((nameList[i], nameList[j], int(D[i, j])))
-    
-    # Sort the distance_pairs by distance in descending order
-    distance_pairs.sort(key=lambda x: x[2], reverse=True)
-    
-    # Create a DataFrame
-    df = pd.DataFrame(distance_pairs, columns=['coin 1', 'coin 2', 'number of matches'])
-    
-    # Write to CSV
-    finalPath = Path(folderPath,output_filename)
-    df.to_csv(finalPath, index=False,sep=';')
+exit_event = threading.Event()
 
-
-       
-def getMatrixAndNumber(kp1,des1,kp2,des2,ratio,ransacReprojThreshold,maxIters:int):
-    
-
-    # flann = cv.FlannBasedMatcher()
-
-    # # Perform matching
-    # matches = flann.knnMatch(des1, des2, k=2)
-        
-    bf = cv.BFMatcher()
-    matches = bf.knnMatch(des1,des2,k=2)
-
-
-    # Apply ratio test
-    good = []
-    for m,n in matches:
-        if m.distance < ratio*n.distance:
-            good.append([m])
-    
-    # Estimation de la transformation
-    goodArray = np.array(good).ravel()
-    src_pts = np.float32( [  kp1[m.queryIdx] for m in goodArray]).reshape(-1,1,2)
-    dst_pts = np.float32( [  kp2[m.trainIdx] for m in goodArray]).reshape(-1,1,2)
-
-    
-    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold,maxIters=maxIters)
-    nbMatchedFeatures = np.sum(rigid_mask==1)
-
-    #del flann
-
-    return H,nbMatchedFeatures
-    
-
-
-def getSliderImg(img1:np.ndarray,img2:np.ndarray,H:np.ndarray,x:float,l:int)->np.ndarray:
-    """Crée une image qui est composé en partie de l'image 1 transformée par la matrice H et de l'image 2
-
-    Args:
-        img1 (np.ndarray): image1 OpenCV BGR
-        img2 (np.ndarray): image2 OpenCV BGR
-        H (np.ndarray): Matrice de transformation rigide
-        x (float): position de la coupure entre les deux images 0<x<1
-        l (int): largeur en pixel de l'image centrée sur la zone d'importance
-
-    Returns:
-        np.ndarray: image Composite matplotlib RGB 
-    """
-
-    # transformation de l'image 1
-    img1Warped = cv.warpAffine(img1, H, (img1.shape[1],img1.shape[0]),borderMode=cv.BORDER_CONSTANT,borderValue=(255,255,255)) 
-    cY,cX = _getCenter(img2)
-    
-    # composition des deux images
-    img3 = _getImageCompose(img1Warped,img2,x,l,cX)
-    img3RBG = cv.cvtColor(img3, cv.COLOR_BGR2RGB)
-    
-    #Zoom
-    zoomED = img3RBG[cY-l:cY+l,cX-l:cX+l,:]
-    return zoomED
-
-
-def getImgDrawMatchv2(path1,
-                      path2,
-                        nFeatures:int,
-                        contrastThreshold:float,
-                        edgeThreshold :float,
-                        siftSigma : float,
-                        enablePreciseUpscale : bool,
-                        nOctaveLayers: int,
-                        ratio:float,
-                        ransacReprojThreshold:float,
-                        maxIters :int,
-                        usePreprocessing:bool,
-                        preprocessingParam:dict):
-    
-    clipLimit = preprocessingParam["clipLimit"]
-    gridSize = preprocessingParam["gridSize"]
-    h = preprocessingParam["h"]
-
-    clahe = cv.createCLAHE(clipLimit=clipLimit, tileGridSize=(gridSize,gridSize))
-    
-    sift = cv.SIFT_create(nfeatures=nFeatures,
-                        nOctaveLayers=nOctaveLayers,    # Number of layers in each octave
-                        contrastThreshold=contrastThreshold,    # Threshold to filter out weak features
-                        edgeThreshold=edgeThreshold,    # Threshold for edge rejection
-                        sigma=siftSigma,    # Standard deviation for Gaussian smoothing
-                        enable_precise_upscale  = enablePreciseUpscale
-            )
-    
-    img1 = cv.imread(str(path1),cv.IMREAD_GRAYSCALE) # queryImage     
-    img2 = cv.imread(str(path2),cv.IMREAD_GRAYSCALE) # queryImage    
-    # Get the height and width of the image
-    height, _ = img1.shape[:2]
-
-    # Remove the bottom 100 pixels
-    new_height = height - 100
-    img1 = img1[:new_height, :]
-    img2 = img2[:new_height, :]
-
-
-    if usePreprocessing:
-        imgHist = clahe.apply(img1)
-        img1 =  cv.fastNlMeansDenoising(imgHist,None,h)
-
-        imgHist = clahe.apply(img2)
-        img2 =  cv.fastNlMeansDenoising(imgHist,None,h)
-
-    kp1, des1 = sift.detectAndCompute(img1,None)
-    kp2, des2 = sift.detectAndCompute(img2,None)
-    
-    bf = cv.BFMatcher()
-    matches = bf.knnMatch(des1,des2,k=2)
-    # Apply ratio test
-    good = []
-    for m,n in matches:
-        if m.distance < ratio*n.distance:
-            good.append([m])
-    
-    # Estimation de la transformation
-    goodArray = np.array(good).ravel()
-    src_pts = np.float32( [  kp1[m.queryIdx].pt for m in goodArray]).reshape(-1,1,2)
-    dst_pts = np.float32( [  kp2[m.trainIdx].pt for m in goodArray]).reshape(-1,1,2)
-    
-    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold,maxIters=maxIters)
-    
-    goodFiltered = [ match for idx,match in enumerate(good) if rigid_mask.ravel()[idx] == 1 ]
-
-    img3 = cv.drawMatchesKnn(img1,kp1,img2,kp2,goodFiltered,None,flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
-    nbFeatures = np.sum(rigid_mask==1)
-    
-    return img3,nbFeatures
 
 
 def getMatrixFromFolder(folderPath:Path,
@@ -172,7 +26,6 @@ def getMatrixFromFolder(folderPath:Path,
                         maxIters:int,
                         callback:callable,
                         usePreprocessing:bool,
-                        discradLinkOnScale :float,
                         preprocessingParam:dict,
                         numProcessors:int):
     """Calcule la matrice des correspondances D[i,j] = nbFeatures(i,j) et renvoie un tableau contenant
@@ -231,42 +84,39 @@ def getMatrixFromFolder(folderPath:Path,
 
         kpDesList.append([onlyPoints,des1])
 
-        print(f"preprocessing {id}/{N}",end='\r')
+        print(f"preprocessing {id}/{N}")
 
     nKeyPoints = np.array([len(kpDes[1]) for kpDes in kpDesList])
     print(f"nombre de moyen de kp par image : {np.mean(nKeyPoints)}")
     
     print("preprocessing DONE")
 
-    asincResults = []
-    
-    c= 0
 
-    def resultCallback(res,idRow):
-        nonlocal c  # Declare c as a global variable
-        c = c+ idRow
-        print(c/total*100)
-        asincResults.append((res,idRow))
-    
-    ## Calcul 
+    print("Start computing")
+
+    folder_path = "monitoring"
+    subFolderPath = Path(folder_path,folder_path)
+    os.makedirs(subFolderPath, exist_ok=True)
 
     total = N*(N-1)/2
+    t0 = time.time()
 
-    args = [ (idx ,kpDesList,ratio, ransacReprojThreshold,maxIters) for idx in range(1,N)]
+    x = threading.Thread(target=threadFunction, args=(subFolderPath,total,t0))
+    x.start()
+
+    args = [ (idx ,kpDesList,ratio, ransacReprojThreshold,maxIters,subFolderPath) for idx in range(1,N)]
     with Pool(processes=numProcessors) as pool:
-        for arg in args:
-            pool.apply_async(getRowOfDistance, arg, callback=lambda res, idRow=arg[0]: resultCallback(res, idRow))
+        DAndHInLines = pool.starmap(getRowOfDistance, args)
 
-        pool.close()
-        pool.join()
+    # To close the thread from the main thread
+    exit_event.set()
+    x.join() 
 
-    # tri du calcul asynchrone
-    asincResults.sort(key=lambda x: x[1])
-    DAndHInLines = [result[0] for result in asincResults]
+    shutil.rmtree(subFolderPath)
 
     ## reconstruction de la matrice
     DLines = [resIter[0] for resIter in DAndHInLines]    
-    print(DLines)
+
     D = np.empty((N,N))
     D[:] = np.NaN
     for idx1 in range(1,N):
@@ -285,8 +135,64 @@ def getMatrixFromFolder(folderPath:Path,
             
     return nameList,D,Hm
 
+def getMatrixAndNumber(kp1,des1,kp2,des2,ratio,ransacReprojThreshold,maxIters:int):
+    
 
-def getRowOfDistance(idx1,kpDesList,ratio,ransacReprojThreshold,maxIters):
+    # flann = cv.FlannBasedMatcher()
+
+    # # Perform matching
+    # matches = flann.knnMatch(des1, des2, k=2)
+        
+    bf = cv.BFMatcher()
+    matches = bf.knnMatch(des1,des2,k=2)
+
+
+    # Apply ratio test
+    good = []
+    for m,n in matches:
+        if m.distance < ratio*n.distance:
+            good.append([m])
+    
+    # Estimation de la transformation
+    goodArray = np.array(good).ravel()
+    src_pts = np.float32( [  kp1[m.queryIdx] for m in goodArray]).reshape(-1,1,2)
+    dst_pts = np.float32( [  kp2[m.trainIdx] for m in goodArray]).reshape(-1,1,2)
+
+    
+    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold,maxIters=maxIters)
+    nbMatchedFeatures = np.sum(rigid_mask==1)
+
+    #del flann
+
+    return H,nbMatchedFeatures
+    
+
+
+def threadFunction(subFolderPath,total,t0):
+    lastAvancement = 0 
+    while not exit_event.is_set():
+        files_in_folder = os.listdir(subFolderPath)
+        sum_of_process_ids = 0
+
+        for file_name in files_in_folder:
+            if file_name.startswith("process_") and file_name.endswith(".txt"):
+                process_id = int(file_name.split("_")[1].split(".")[0])
+                sum_of_process_ids += process_id
+
+        avancement = sum_of_process_ids/total
+        if avancement != 0 :
+            dtOveravancement = ((time.time()-t0))/avancement
+        else: 
+            dtOveravancement = 0
+
+        if avancement!=lastAvancement:
+            print(f" matching : {avancement*100:.2f} %")
+            print(f" remaining time :",str(datetime.timedelta(seconds=int((1-avancement)*dtOveravancement))))
+            print()
+            lastAvancement = avancement
+        time.sleep(5)
+
+def getRowOfDistance(idx1,kpDesList,ratio,ransacReprojThreshold,maxIters,subFolder):
     # calcule une seule ligne (utilisé pour multiprocessing)
     # renvoie une seule ligne de D et une seule ligne de H dans un tuple
     # return (D,H)
@@ -300,7 +206,6 @@ def getRowOfDistance(idx1,kpDesList,ratio,ransacReprojThreshold,maxIters):
         H,nbFeatures = getMatrixAndNumber(kp1,des1,kp2,des2,ratio=ratio,ransacReprojThreshold=ransacReprojThreshold,maxIters=maxIters)
         
         s = np.sqrt(H[0,0]**2 +H[1,0]**2)
-        # if the scale is too important discard the link
         if np.abs(s-1)>0.25:
             D.append(0)
         else:
@@ -308,7 +213,133 @@ def getRowOfDistance(idx1,kpDesList,ratio,ransacReprojThreshold,maxIters):
 
         Hm.append(H)
 
+    file_path = os.path.join(subFolder, f"process_{idx1}.txt")
+    with open(file_path, 'w') as file:
+        pass
+
     return (D,Hm)
+
+
+def getImgDrawMatchv2(path1,
+                      path2,
+                        nFeatures:int,
+                        contrastThreshold:float,
+                        edgeThreshold :float,
+                        siftSigma : float,
+                        enablePreciseUpscale : bool,
+                        nOctaveLayers: int,
+                        ratio:float,
+                        ransacReprojThreshold:float,
+                        maxIters :int,
+                        usePreprocessing:bool,
+                        preprocessingParam:dict):
+    
+    clipLimit = preprocessingParam["clipLimit"]
+    gridSize = preprocessingParam["gridSize"]
+    h = preprocessingParam["h"]
+
+    clahe = cv.createCLAHE(clipLimit=clipLimit, tileGridSize=(gridSize,gridSize))
+    
+    sift = cv.SIFT_create(nfeatures=nFeatures,
+                        nOctaveLayers=nOctaveLayers,    # Number of layers in each octave
+                        contrastThreshold=contrastThreshold,    # Threshold to filter out weak features
+                        edgeThreshold=edgeThreshold,    # Threshold for edge rejection
+                        sigma=siftSigma,    # Standard deviation for Gaussian smoothing
+                        enable_precise_upscale  = enablePreciseUpscale
+            )
+    
+    img1 = cv.imread(str(path1),cv.IMREAD_GRAYSCALE) # queryImage     
+    img2 = cv.imread(str(path2),cv.IMREAD_GRAYSCALE) # queryImage    
+    # Get the height and width of the image
+    height, _ = img1.shape[:2]
+
+    # Remove the bottom 100 pixels
+    new_height = height - 100
+    img1 = img1[:new_height, :]
+    img2 = img2[:new_height, :]
+
+
+    if usePreprocessing:
+        imgHist = clahe.apply(img1)
+        img1 =  cv.fastNlMeansDenoising(imgHist,None,h)
+
+        imgHist = clahe.apply(img2)
+        img2 =  cv.fastNlMeansDenoising(imgHist,None,h)
+
+    kp1, des1 = sift.detectAndCompute(img1,None)
+    kp2, des2 = sift.detectAndCompute(img2,None)
+    
+    bf = cv.BFMatcher()
+    matches = bf.knnMatch(des1,des2,k=2)
+    # Apply ratio test
+    good = []
+    for m,n in matches:
+        if m.distance < ratio*n.distance:
+            good.append([m])
+
+    
+    # Estimation de la transformation
+    goodArray = np.array(good).ravel()
+    src_pts = np.float32( [  kp1[m.queryIdx].pt for m in goodArray]).reshape(-1,1,2)
+    dst_pts = np.float32( [  kp2[m.trainIdx].pt for m in goodArray]).reshape(-1,1,2)
+    
+    H, rigid_mask = cv.estimateAffinePartial2D(src_pts, dst_pts,method=cv.RANSAC,ransacReprojThreshold=ransacReprojThreshold,maxIters=maxIters)
+    
+    goodFiltered = [ match for idx,match in enumerate(good) if rigid_mask.ravel()[idx] == 1 ]
+
+    img3 = cv.drawMatchesKnn(img1,kp1,img2,kp2,goodFiltered,None,flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)
+    nbFeatures = np.sum(rigid_mask==1)
+    
+    return img3,nbFeatures
+
+
+def saveToCsv(folderPath,nameList:list,D:np.ndarray):
+    output_filename = 'results.csv'
+    
+    n = len(nameList)
+    # Create a list to store distances and their corresponding pairs
+    distance_pairs = []
+    for i in range(n):
+        for j in range(i):
+            if not np.isnan(D[i, j]):
+                distance_pairs.append((nameList[i], nameList[j], int(D[i, j])))
+    
+    # Sort the distance_pairs by distance in descending order
+    distance_pairs.sort(key=lambda x: x[2], reverse=True)
+    
+    # Create a DataFrame
+    df = pd.DataFrame(distance_pairs, columns=['coin 1', 'coin 2', 'number of matches'])
+    
+    # Write to CSV
+    finalPath = Path(folderPath,output_filename)
+    df.to_csv(finalPath, index=False,sep=';')
+
+def getSliderImg(img1:np.ndarray,img2:np.ndarray,H:np.ndarray,x:float,l:int)->np.ndarray:
+    """Crée une image qui est composé en partie de l'image 1 transformée par la matrice H et de l'image 2
+
+    Args:
+        img1 (np.ndarray): image1 OpenCV BGR
+        img2 (np.ndarray): image2 OpenCV BGR
+        H (np.ndarray): Matrice de transformation rigide
+        x (float): position de la coupure entre les deux images 0<x<1
+        l (int): largeur en pixel de l'image centrée sur la zone d'importance
+
+    Returns:
+        np.ndarray: image Composite matplotlib RGB 
+    """
+
+    # transformation de l'image 1
+    img1Warped = cv.warpAffine(img1, H, (img1.shape[1],img1.shape[0]),borderMode=cv.BORDER_CONSTANT,borderValue=(255,255,255)) 
+    cY,cX = _getCenter(img2)
+    
+    # composition des deux images
+    img3 = _getImageCompose(img1Warped,img2,x,l,cX)
+    img3RBG = cv.cvtColor(img3, cv.COLOR_BGR2RGB)
+    
+    #Zoom
+    zoomED = img3RBG[cY-l:cY+l,cX-l:cX+l,:]
+    return zoomED
+
 
 def getOrderedLinks(D,Hm):
     
