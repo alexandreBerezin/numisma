@@ -6,27 +6,18 @@ from pathlib import Path
 
 import cv2 as cv
 from PIL import Image,ImageTk
-
 import threading
-
-import time
 import numpy as np
 
 #load config
 from config import *
-
 import core
 
-
-preprocessingParam = {
-    "clipLimit" : CLIP_LIMIT,
-    "gridSize": GRID_SIZE,
-    "h" : PREPROCESSING_H,
-}
 
 class App(tk.Tk):
     def __init__(self, *args, **kwargs):
         tk.Tk.__init__(self, *args, **kwargs)
+
         ### top frame
         topFrame = tk.Frame(self,highlightbackground="black", highlightthickness=1)
         topFrame.pack(side="top",fill=tk.X)
@@ -43,13 +34,13 @@ class App(tk.Tk):
         self.container.grid_rowconfigure(0, weight=1)
         self.container.grid_columnconfigure(0, weight=1)
         
-
         self.frames = {}
         
         F = StartPage
         page_name = F.__name__
         frame = F(parent=self.container, controller=self)
         self.frames[page_name] = frame
+
 
         # put all of the pages in the same location;
         # the one on the top of the stacking order
@@ -58,36 +49,23 @@ class App(tk.Tk):
 
         self.show_frame("StartPage")
 
+    def create_and_show_compare_page(self):
+        F = ComparePage
+        page_name = F.__name__
+        frame = F(parent=self.container, controller=self)
+        self.frames[page_name] = frame
+        frame.grid(row=0, column=0, sticky="nsew")
+        self.show_frame("ComparePage")
 
     def show_frame(self, page_name):
         '''Show a frame for the given page name'''
         frame = self.frames[page_name]
         frame.tkraise()
-        
-    def updateParam(self,nameList, D ,Hm,orderedLinks,folderPath):
-        print("Update Param")
-        self.nameList = nameList
-        self.D = D
-        self.Hm = Hm
-        self.orderedLinks = orderedLinks
-        self.folderPath = folderPath
-        
-        F = ComparePage
-        page_name = F.__name__
-        frame = F(parent=self.container, controller=self)
-        self.frames[page_name] = frame
-        # put all of the pages in the same location;
-        # the one on the top of the stacking order
-        # will be the one that is visible.
-        frame.grid(row=0, column=0, sticky="nsew")
-        
-        self.show_frame("ComparePage")
-        
+      
     def startNewComputation(self,folderPath):
-        print("START COMPUTATION")
         F = ComputationPage
         page_name = F.__name__
-        frame = F(parent=self.container, controller=self,folderPath=folderPath)
+        frame = F(parent=self.container, controller=self)
         self.frames[page_name] = frame
         # put all of the pages in the same location;
         # the one on the top of the stacking order
@@ -108,37 +86,45 @@ class StartPage(tk.Frame):
                             command=lambda: self.selectFolder())
 
         button1.pack(padx=20,pady=20)
-        
-        
-        
             
     def selectFolder(self):
         dir = fd.askdirectory()
-        folderPath = Path(dir)
+        self.controller.folder_path = Path(dir)
+        folder_path = Path(dir)
 
-        if core.isDataAvailable(folderPath):
-            
-            MsgBox = tk.messagebox.askquestion ('Données de calcul',"Des données d'un calcul précédent ont été trouvées, voulez vous les utiliser ? ")
+        if core.is_data_available(folder_path):
+
+
+            ### données accessibles
+            MsgBox = tk.messagebox.askquestion ('Données de calcul',"Des données d'un calcul précédent ont été trouvés, voulez vous les utiliser ? ")
             if MsgBox == 'yes':
                 print("data available")
             
-                nameList, D ,Hm = core.getSavedData(folderPath)
-                orderedLinks = core.getOrderedLinks(D,Hm)
+                N, Hm,detector_param,matcher_param = core.get_saved_data(folder_path)
+                detector  = core.KeypointDetector(folder_path=folder_path,**detector_param)
+                matcher = core.imagesMatcher(N=N,Hm=Hm,**matcher_param)
                 
-                self.controller.updateParam(nameList, D ,Hm,orderedLinks,folderPath)
+                self.controller.orderedLinks = core.getOrderedLinks(N)
+
+                self.controller.all_path = detector.all_path
+                self.controller.detector = detector
+                self.controller.matcher = matcher
+
+                self.controller.create_and_show_compare_page()
                 
                 self.controller.frames["ComparePage"].setNewImg()
                 self.controller.frames["ComparePage"].updateFromSlider(50)
+
                 
-                self.controller.show_frame("ComparePage")
+
 
             else:
-                self.controller.startNewComputation(folderPath)
+                self.controller.startNewComputation(folder_path)
             
 
             
         else:
-            self.controller.startNewComputation(folderPath)
+            self.controller.startNewComputation(folder_path)
         
 class ComparePage(tk.Frame):
 
@@ -152,7 +138,7 @@ class ComparePage(tk.Frame):
         
         ###Top folder Path
         
-        label = tk.Label(self, text=f"Dossier : {self.controller.folderPath}")
+        label = tk.Label(self, text=f"Dossier : {self.controller.folder_path}")
         label.pack(side="top", fill="x", pady=2)
         
         
@@ -222,23 +208,23 @@ class ComparePage(tk.Frame):
         
     def setNewImg(self):
         id1,id2 = self.controller.orderedLinks[self.index]
-        self.H = self.controller.Hm[id1,id2]
-
-
+        self.H = self.controller.matcher.Hm[id1,id2]
         
-        folderPath = self.controller.folderPath
-        nameList = self.controller.nameList
+        all_path = self.controller.all_path
+
+        self.id1 = id1
+        self.id2 = id2
         
-        path1 = Path(folderPath,nameList[id1])
-        path2 = Path(folderPath,nameList[id2])
+        path1 = Path(all_path[id1])
+        path2 = Path(all_path[id2])
     
         self.img1 = cv.imread(str(path1)) # queryImage
         self.path1 = path1
         self.img2 = cv.imread(str(path2)) # trainImage
         self.path2 = path2
         
-        self.labelCoin.config(text = f"liaison {self.index}/{self.numberLinks} \n {nameList[id1]}   -  {nameList[id2]} \n N = {int(self.controller.D[id1,id2])} ")
-        if (int(self.controller.D[id1,id2]) == 0):
+        self.labelCoin.config(text = f"liaison {self.index}/{self.numberLinks} \n {path1.name}   -  {path2.name} \n N = {int(self.controller.matcher.N[id1,id2])} ")
+        if (int(self.controller.matcher.N[id1,id2]) == 0):
             self.displayMode = 1
         else:
             self.displayMode = 0
@@ -272,21 +258,7 @@ class ComparePage(tk.Frame):
         elif(self.displayMode == 2):
             print("OK ")
 
-            img1,_ = core.getImgDrawMatchv2(self.path1,
-                                            self.path2,
-                                                nFeatures = N_FEATURES,
-                                                contrastThreshold=CONTRAST_THRESHOLD,
-                                                edgeThreshold = EDGE_THRESHOLD,
-                                                siftSigma = SIFT_SIGMA,
-                                                enablePreciseUpscale = ENABLE_PRECISE_UPSCALE,
-                                                nOctaveLayers = N_OCTAVE_LAYERS,
-                                                ratio=RATIO,
-                                                ransacReprojThreshold=RANSAC_REPROJ_THRESHOLD,
-                                                maxIters=MAX_ITER,
-                                                usePreprocessing=USE_PREPROCESSING,
-                                                preprocessingParam=preprocessingParam)
-            
-
+            img1, _ =core.get_draw_match_image_by_id(self.id1,self.id2,self.controller.detector,self.controller.matcher)
             img = Image.fromarray(img1)
             img = ImageTk.PhotoImage(img)
             self.labelImg.configure(image=img)
@@ -313,9 +285,9 @@ class ComparePage(tk.Frame):
         
 class ComputationPage(tk.Frame):
 
-    def __init__(self, parent, controller,folderPath):
+    def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
-        self.folderPath = folderPath
+        self.folder_path = controller.folder_path
         self.controller = controller
         
         self.presentation = tk.StringVar()
@@ -338,68 +310,48 @@ class ComputationPage(tk.Frame):
         labelAvanc = tk.Label(self, textvariable=self.strAvance)
         labelAvanc.pack(side="top", fill="x", pady=10)
         
-        
-        
-
-        
-        
     def start(self):
         import numpy as np
-        
+
         self.presentation.set("Calcul en cours...")
         self.button1["state"]= tk.DISABLED
+
+        detector = core.KeypointDetector(folder_path=self.folder_path,**DETECTOR_PARAM)
+        kpDesList, all_path = detector.get_kp_des_from_folder()
+        matcher = core.imagesMatcher(kp_des_list=kpDesList,callback=self.callbackProgressBar,n_processes=NUM_PROCESSORS,**MATCHER_PARAM)
+        N,Hm = matcher.get_N_and_H()
+ 
         
-        self.timeCounter = 0 
-        self.tmpsRestantMin = 0
 
-        nameList, D ,Hm= core.getMatrixFromFolder(self.folderPath,
-                                                  nFeatures = N_FEATURES,
-                                                  contrastThreshold=CONTRAST_THRESHOLD,
-                                                  edgeThreshold = EDGE_THRESHOLD,
-                                                  siftSigma = SIFT_SIGMA,
-                                                  enablePreciseUpscale = ENABLE_PRECISE_UPSCALE,
-                                                  nOctaveLayers = N_OCTAVE_LAYERS,
-                                                  ratio=RATIO,
-                                                  ransacReprojThreshold=RANSAC_REPROJ_THRESHOLD,
-                                                  maxIters=MAX_ITER,
-                                                  callback=self.callbackProgressBar,
-                                                  usePreprocessing=USE_PREPROCESSING,
-                                                  numProcessors=NUM_PROCESSORS,
-                                                  preprocessingParam=preprocessingParam)
+        ### Save Param 
+        np.save(Path(self.folder_path) / "detector_param.npy",detector.param,allow_pickle=True)
+        np.save(Path(self.folder_path) / "matcher_param.npy",matcher.param,allow_pickle=True)
+        np.save(Path(self.folder_path)/ "N.npy",N )
+        np.save(Path(self.folder_path)/ "Hm.npy",Hm )
 
-        np.save(Path(self.folderPath,"D.npy"),D)
-        np.save(Path(self.folderPath,"Hm.npy"),Hm)
-        np.save(Path(self.folderPath,"nameList.npy"),nameList)
 
         print("SAVING TO CSV")
 
-        core.saveToCsv(self.folderPath,nameList,D)
+        core.saveToCsv(self.controller.folder_path,all_path,N)
                     
-        nameList, D ,Hm = core.getSavedData(self.folderPath)
-        orderedLinks = core.getOrderedLinks(D,Hm)
         
-        self.controller.updateParam(nameList, D ,Hm,orderedLinks,self.folderPath)
+        self.controller.orderedLinks = core.getOrderedLinks(N)
+
+        self.controller.all_path = detector.all_path
+        self.controller.detector = detector
+        self.controller.matcher = matcher
+
+        self.controller.create_and_show_compare_page()
         
         self.controller.frames["ComparePage"].setNewImg()
         self.controller.frames["ComparePage"].updateFromSlider(50)
-        
-        self.controller.show_frame("ComparePage")
+     
+    def callbackProgressBar(self,progression,remainigTime):
+
+        self.strAvance.set(remainigTime)
+        self.progress_var.set(str(progression))
 
 
-                
-    def callbackProgressBar(self,c,total):
-        self.timeCounter += 1 
-        pourcent = 100*c/total
-        self.progress_var.set(pourcent)
-        self.strAvance.set(f"{pourcent:.2f}% \n temps restant : {self.tmpsRestantMin:.2f}min")
-        if self.timeCounter == 1 :
-            self.t1 = time.time()
-        if self.timeCounter == 50:
-            delta = (time.time()-self.t1)/50 #par liaison
-            
-            tempsRestant = delta*(total-c)
-            self.tmpsRestantMin = tempsRestant/60
-            self.timeCounter = 0 
               
 def start():
     app = App()

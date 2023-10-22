@@ -1,25 +1,22 @@
 # numisma
-
 outil de classification d'anciennes monnaies
 
-## Installation (avec Conda)
-- se deplacer dans un dossier d'installation 
-- copier le code avec :   
-git clone https://github.com/alexandreBerezin/numisma.git
-- se deplacer dans le dossier numisma
-- installer l'environnement conda avec :   
-conda env create -f environment.yml
-- activer l'environnement   
-conda activate numisma 
-- lancer l'interface graphique avec   
-python gui.py
-- selectionner un dossier contenu dans le dossier data
+## Installation
+dans le dossier 
+pip install -r requirements.txt
 
+## Interface graphique
+Pour lancer l'interface graphique
+python gui.py 
+
+## en ligne de code
+Un exemple de script est fourni dans run.py
 
 ## raccourcis
 
 liaison suivate:    ESPACE   
-liaison précédente: EFFACER   
+liaison précédente: EFFACER  
+afficher les correspondances : d 
 changer de mode:    m    
 bouger le slider:   <- et ->    
 
