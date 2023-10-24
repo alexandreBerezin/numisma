@@ -16,6 +16,8 @@ import cv2 as cv
 
 
 class KeypointDetector():
+    """Classe utilisé pour la detection et la desctiption des points d'intérêts
+    """
     def __init__(self,
                  folder_path: os.PathLike,
                  use_preprocessing: bool = True,
@@ -167,6 +169,9 @@ class imagesMatcher():
                          max_iter_ransac: int,
                          ransac_confidence: float,
                          sub_folder_path: os.PathLike) -> Tuple[list, list]:
+        """Une fonction qui calculer une seule ligne (idx) des matrices de distance 
+        et des matrices de projection
+        """
         D = []
         Hm = []
 
@@ -333,8 +338,12 @@ def get_draw_match_image_by_id(id1: int,
                          image_matcher: imagesMatcher) -> Tuple[np.ndarray, int]:
 
 
+    
     path1 = key_point_detector.all_path[id1]
     path2 = key_point_detector.all_path[id2]
+
+    img1 = key_point_detector.get_img_from_path(str(path1))
+    img2 = key_point_detector.get_img_from_path(str(path2))
 
     kp1, des1 = key_point_detector.get_kp_desc_from_image(str(path1))
     kp2, des2 = key_point_detector.get_kp_desc_from_image(str(path2))
@@ -344,8 +353,6 @@ def get_draw_match_image_by_id(id1: int,
 
     matching_mask = image_matcher.get_matching_mask(kp1, des1, kp2, des2)
 
-    img1 = cv.imread(str(path1), cv.IMREAD_GRAYSCALE)
-    img2 = cv.imread(str(path1), cv.IMREAD_GRAYSCALE)
 
     img3 = cv.drawMatchesKnn(img1, opencv_kp1, img2, opencv_kp2, matching_mask,
                              None, flags=cv.DrawMatchesFlags_NOT_DRAW_SINGLE_POINTS)

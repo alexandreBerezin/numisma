@@ -22,10 +22,10 @@ class App(tk.Tk):
         topFrame = tk.Frame(self,highlightbackground="black", highlightthickness=1)
         topFrame.pack(side="top",fill=tk.X)
         
-        titleLabel = tk.Label(master=topFrame,text="Numisma v1.1",padx=5,pady=5)
+        titleLabel = tk.Label(master=topFrame,text="Numisma v1.2",padx=5,pady=5)
         titleLabel.pack(side="left")
         
-        versionLabel = tk.Label(master=topFrame,text="05/10/2023")
+        versionLabel = tk.Label(master=topFrame,text="23/10/2023")
         versionLabel.pack(side="right")
         
         ### main container
@@ -161,20 +161,19 @@ class ComparePage(tk.Frame):
         
         btn_before = tk.Button(master=ImgAndSliderFrame, text="Précédent",command=self.beforeLink)
         btn_before.pack(side="left",padx=10,pady=10)
+
+        self.displayMode = 0 # slider 
         
         btn_mode = tk.Button(master=ImgAndSliderFrame, text="mode",command=self.changeMode)
         btn_mode.pack(side="bottom",padx=10,pady=10)
         
-        self.displayMode = 0 # slider 
+
         
         self.controller.bind('<KeyPress>',self.key_press)
         
     
-    def changeMode(self,mode):
-        if mode=='d':
-            self.displayMode = 2
-            self.updateFromSlider(50)
-        elif self.displayMode == 0:
+    def changeMode(self):
+        if self.displayMode == 0:
             self.displayMode = 1
             self.updateFromSlider(50)
         else:
@@ -194,10 +193,12 @@ class ComparePage(tk.Frame):
             self.nextLink()
             
         if e.keysym == "d":
-            self.changeMode("d")
+            self.displayMode = 2
+            self.updateFromSlider(50)
 
         if e.keysym == "m":
-            self.changeMode("_")
+            self.changeMode()
+
             
         if e.keysym == "BackSpace":
             self.beforeLink()
@@ -256,7 +257,6 @@ class ComparePage(tk.Frame):
             self.labelImg.image=img
 
         elif(self.displayMode == 2):
-            print("OK ")
 
             img1, _ =core.get_draw_match_image_by_id(self.id1,self.id2,self.controller.detector,self.controller.matcher)
             img = Image.fromarray(img1)

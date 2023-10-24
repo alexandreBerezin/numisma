@@ -21,9 +21,9 @@ DETECTOR_PARAM = {
 
 MATCHER_PARAM = {
     'ratio': 0.99,
-    'ransac_reproj_treshold': 3,
+    'ransac_reproj_treshold': 6,
     'max_iter_ransac': 10000000,
-    'ransac_confidence': 0.95}
+    'ransac_confidence': 0.99}
 
 
 ###### Controls ######
