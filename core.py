@@ -1,5 +1,6 @@
 from pathlib import Path
-from multiprocessing import Pool
+from multiprocessing import Pool,set_start_method
+
 import threading
 import time
 import os
@@ -12,6 +13,13 @@ from typing import List, Tuple
 import pandas as pd
 import numpy as np
 import cv2 as cv
+
+#
+try:
+   set_start_method('spawn', force=True)
+   print("spawned")
+except RuntimeError:
+   pass
 
 
 
